@@ -2,6 +2,7 @@ import type { PlasmoCSConfig } from "plasmo"
 
 import { debounceForElement } from "../lib/debounce"
 import { classifyEditable, readText, type EditableTarget } from "../lib/editable"
+import { check } from "../lib/languagetool"
 import { getSettings, onSettingsChange } from "../lib/storage"
 import { DEFAULT_SETTINGS, type Settings } from "../lib/types"
 
@@ -15,6 +16,7 @@ const DEBOUNCE_MS = 800
 const MIN_TEXT_LENGTH = 5
 
 let settings: Settings = DEFAULT_SETTINGS
+const inflight = new WeakMap<Element, AbortController>()
 
 function init() {
   void getSettings().then((s) => {
@@ -36,18 +38,30 @@ function init() {
   )
 }
 
-function onDebouncedInput(target: EditableTarget) {
+async function onDebouncedInput(target: EditableTarget) {
   const text = readText(target)
   if (text.length < MIN_TEXT_LENGTH) return
-  // Commit 4 wires this into the LanguageTool client.
-  // For now, just log so we can verify the detection + debounce path.
-  // eslint-disable-next-line no-console
-  console.log("[grammar-pal]", {
-    targetTag: target.el.tagName.toLowerCase(),
-    kind: target.kind,
-    mode: settings.mode,
-    textPreview: text.slice(0, 80)
-  })
+
+  const previous = inflight.get(target.el)
+  previous?.abort()
+  const controller = new AbortController()
+  inflight.set(target.el, controller)
+
+  try {
+    const matches = await check(text, settings.mode, controller.signal)
+    if (controller.signal.aborted) return
+    // eslint-disable-next-line no-console
+    console.log("[grammar-pal] matches", {
+      kind: target.kind,
+      mode: settings.mode,
+      count: matches.length,
+      matches
+    })
+  } catch (err) {
+    if ((err as { name?: string }).name === "AbortError") return
+    // eslint-disable-next-line no-console
+    console.warn("[grammar-pal] check failed", err)
+  }
 }
 
 init()
