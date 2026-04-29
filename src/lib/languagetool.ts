@@ -20,6 +20,15 @@ type LtMatch = {
 
 type LtResponse = {
   matches?: LtMatch[]
+  language?: {
+    code?: string
+    detectedLanguage?: { code?: string; confidence?: number }
+  }
+}
+
+export type CheckResult = {
+  matches: Match[]
+  isEnglish: boolean
 }
 
 function truncateUtf8(text: string, maxBytes: number): string {
@@ -53,13 +62,14 @@ export async function check(
   text: string,
   mode: Mode,
   signal?: AbortSignal
-): Promise<Match[]> {
+): Promise<CheckResult> {
   const safe = truncateUtf8(text, MAX_TEXT_BYTES)
-  if (safe.length === 0) return []
+  if (safe.length === 0) return { matches: [], isEnglish: false }
 
   const params = new URLSearchParams()
   params.set("text", safe)
-  params.set("language", "en-US")
+  params.set("language", "auto")
+  params.set("preferredVariants", "en-US")
   if (mode === "chill") params.set("disabledCategories", CHILL_DISABLED)
 
   const res = await fetch(ENDPOINT, {
@@ -74,9 +84,16 @@ export async function check(
   }
 
   const json = (await res.json()) as LtResponse
-  const matches = json.matches ?? []
+  const detected = (
+    json.language?.detectedLanguage?.code ??
+    json.language?.code ??
+    ""
+  ).toLowerCase()
+  const isEnglish = detected.startsWith("en")
 
-  return matches.map((m) => ({
+  if (!isEnglish) return { matches: [], isEnglish: false }
+
+  const matches = (json.matches ?? []).map((m) => ({
     offset: m.offset,
     length: m.length,
     message: m.message,
@@ -85,4 +102,6 @@ export async function check(
       .map((r) => r.value),
     category: categoryFor(m.rule)
   }))
+
+  return { matches, isEnglish: true }
 }

@@ -67,8 +67,8 @@ const STYLES = `
 
   .pet {
     position: fixed;
-    right: 16px;
-    bottom: 16px;
+    left: 0;
+    top: 0;
     width: 56px;
     height: 56px;
     pointer-events: auto;
@@ -76,7 +76,21 @@ const STYLES = `
     user-select: none;
     filter: drop-shadow(0 2px 6px rgba(0,0,0,0.18));
   }
+  .pet__face { width: 100%; height: 100%; }
   .pet svg { width: 100%; height: 100%; display: block; }
+  .pet__mode {
+    position: absolute;
+    right: -2px;
+    bottom: -2px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1.5px solid #1f2328;
+    box-sizing: border-box;
+    background: #9ca3af;
+  }
+  .pet__mode--formal { background: #2563eb; }
+  .pet__mode--chill  { background: #10b981; }
 `
 
 export function getShadowRoot(): ShadowRoot {

@@ -15,7 +15,13 @@ import {
   renderUnderlines,
   setUnderlineClickHandler
 } from "../overlay/underlines"
-import { hidePet, setPetCount, showPet } from "../pet/pet"
+import {
+  attachPetTo,
+  detachPet,
+  hidePet,
+  setPetCount,
+  setPetMode
+} from "../pet/pet"
 
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
@@ -31,16 +37,21 @@ let settings: Settings = DEFAULT_SETTINGS
 const inflight = new WeakMap<Element, AbortController>()
 const knownTargets = new Set<EditableTarget>()
 const lastCount = new WeakMap<Element, number>()
+const englishTargets = new WeakSet<HTMLElement>()
 let focusedTarget: EditableTarget | null = null
 
 function init() {
   void getSettings().then((s) => {
     settings = s
+    setPetMode(s.mode)
     applyEnabledState()
   })
   onSettingsChange((s) => {
+    const prev = settings
     settings = s
+    setPetMode(s.mode)
     applyEnabledState()
+    if (s.enabled && s.mode !== prev.mode) recheckAll()
   })
 
   setUnderlineClickHandler((target, match, span) => {
@@ -76,8 +87,12 @@ function init() {
       const target = classifyEditable(event.target)
       if (!target) return
       focusedTarget = target
-      const count = lastCount.get(target.el) ?? 0
-      setPetCount(count)
+      if (englishTargets.has(target.el)) {
+        attachPetTo(target.el)
+        setPetCount(lastCount.get(target.el) ?? 0)
+      } else {
+        detachPet()
+      }
     },
     true
   )
@@ -92,7 +107,7 @@ function init() {
       setTimeout(() => {
         if (focusedTarget?.el === target.el) {
           focusedTarget = null
-          setPetCount(0)
+          detachPet()
         }
       }, 0)
     },
@@ -104,9 +119,11 @@ function applyEnabledState() {
   if (!settings.enabled) {
     clearAll()
     hidePet()
-  } else {
-    showPet()
-    setPetCount(focusedTarget ? lastCount.get(focusedTarget.el) ?? 0 : 0)
+    return
+  }
+  if (focusedTarget && englishTargets.has(focusedTarget.el)) {
+    attachPetTo(focusedTarget.el)
+    setPetCount(lastCount.get(focusedTarget.el) ?? 0)
   }
 }
 
@@ -116,13 +133,23 @@ function clearAll() {
   dismissSuggestionPopup()
 }
 
+function recheckAll() {
+  dismissSuggestionPopup()
+  for (const t of knownTargets) {
+    clearUnderlines(t)
+    void runCheck(t)
+  }
+}
+
 async function runCheck(target: EditableTarget) {
   if (!settings.enabled) return
   const text = readText(target)
   if (text.length < MIN_TEXT_LENGTH) {
     clearUnderlines(target)
     lastCount.set(target.el, 0)
-    if (focusedTarget?.el === target.el) setPetCount(0)
+    if (focusedTarget?.el === target.el && englishTargets.has(target.el)) {
+      setPetCount(0)
+    }
     return
   }
 
@@ -132,12 +159,25 @@ async function runCheck(target: EditableTarget) {
   inflight.set(target.el, controller)
 
   try {
-    const matches = await check(text, settings.mode, controller.signal)
+    const result = await check(text, settings.mode, controller.signal)
     if (controller.signal.aborted) return
+
+    if (!result.isEnglish) {
+      englishTargets.delete(target.el)
+      clearUnderlines(target)
+      lastCount.set(target.el, 0)
+      if (focusedTarget?.el === target.el) detachPet()
+      return
+    }
+
+    englishTargets.add(target.el)
     knownTargets.add(target)
-    renderUnderlines(target, matches)
-    lastCount.set(target.el, matches.length)
-    if (focusedTarget?.el === target.el) setPetCount(matches.length)
+    renderUnderlines(target, result.matches)
+    lastCount.set(target.el, result.matches.length)
+    if (focusedTarget?.el === target.el) {
+      attachPetTo(target.el)
+      setPetCount(result.matches.length)
+    }
   } catch (err) {
     if ((err as { name?: string }).name === "AbortError") return
     // eslint-disable-next-line no-console
