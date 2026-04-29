@@ -5,6 +5,7 @@ import { classifyEditable, readText, type EditableTarget } from "../lib/editable
 import { check } from "../lib/languagetool"
 import { getSettings, onSettingsChange } from "../lib/storage"
 import { DEFAULT_SETTINGS, type Settings } from "../lib/types"
+import { clearUnderlines, renderUnderlines } from "../overlay/underlines"
 
 export const config: PlasmoCSConfig = {
   matches: ["<all_urls>"],
@@ -21,9 +22,11 @@ const inflight = new WeakMap<Element, AbortController>()
 function init() {
   void getSettings().then((s) => {
     settings = s
+    if (!settings.enabled) clearAll()
   })
   onSettingsChange((s) => {
     settings = s
+    if (!settings.enabled) clearAll()
   })
 
   document.addEventListener(
@@ -32,15 +35,27 @@ function init() {
       if (!settings.enabled) return
       const target = classifyEditable(event.target)
       if (!target) return
+      // Stale underlines clear immediately on edit; new ones appear after the debounce.
+      clearUnderlines(target)
       debounceForElement(target.el, () => onDebouncedInput(target), DEBOUNCE_MS)
     },
     true
   )
 }
 
+const knownTargets = new Set<EditableTarget>()
+
+function clearAll() {
+  for (const t of knownTargets) clearUnderlines(t)
+  knownTargets.clear()
+}
+
 async function onDebouncedInput(target: EditableTarget) {
   const text = readText(target)
-  if (text.length < MIN_TEXT_LENGTH) return
+  if (text.length < MIN_TEXT_LENGTH) {
+    clearUnderlines(target)
+    return
+  }
 
   const previous = inflight.get(target.el)
   previous?.abort()
@@ -50,13 +65,8 @@ async function onDebouncedInput(target: EditableTarget) {
   try {
     const matches = await check(text, settings.mode, controller.signal)
     if (controller.signal.aborted) return
-    // eslint-disable-next-line no-console
-    console.log("[grammar-pal] matches", {
-      kind: target.kind,
-      mode: settings.mode,
-      count: matches.length,
-      matches
-    })
+    knownTargets.add(target)
+    renderUnderlines(target, matches)
   } catch (err) {
     if ((err as { name?: string }).name === "AbortError") return
     // eslint-disable-next-line no-console
