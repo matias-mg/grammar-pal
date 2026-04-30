@@ -29,7 +29,7 @@ export const config: PlasmoCSConfig = {
   all_frames: false
 }
 
-const DEBOUNCE_MS = 800
+const DEBOUNCE_MS = 1500
 const MIN_TEXT_LENGTH = 5
 const RECHECK_DELAY_MS = 50
 
