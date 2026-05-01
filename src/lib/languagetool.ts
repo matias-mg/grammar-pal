@@ -1,9 +1,21 @@
+import { runLocalRules } from "./local-rules"
 import type { Category, Match, Mode } from "./types"
 
 const ENDPOINT = "https://api.languagetool.org/v2/check"
 const MAX_TEXT_BYTES = 18 * 1024
 const MAX_REPLACEMENTS = 5
-const CHILL_DISABLED = ["STYLE", "TYPOGRAPHY", "REDUNDANCY"].join(",")
+const CHILL_DISABLED_CATEGORIES = [
+  "CASING",
+  "PUNCTUATION",
+].join(",")
+const CHILL_DISABLED_RULES = [
+  "I_LOWERCASE",
+  "UPPERCASE_SENTENCE_START",
+  "PUNCTUATION_PARAGRAPH_END",
+  "DOUBLE_PUNCTUATION",
+  "EN_QUOTES",
+  "WHITESPACE_RULE"
+].join(",")
 
 type LtRule = {
   id?: string
@@ -70,7 +82,10 @@ export async function check(
   params.set("text", safe)
   params.set("language", "auto")
   params.set("preferredVariants", "en-US")
-  if (mode === "chill") params.set("disabledCategories", CHILL_DISABLED)
+  if (mode === "chill") {
+    params.set("disabledCategories", CHILL_DISABLED_CATEGORIES)
+    params.set("disabledRules", CHILL_DISABLED_RULES)
+  }
 
   const res = await fetch(ENDPOINT, {
     method: "POST",
@@ -93,7 +108,7 @@ export async function check(
 
   if (!isEnglish) return { matches: [], isEnglish: false }
 
-  const matches = (json.matches ?? []).map((m) => ({
+  const apiMatches: Match[] = (json.matches ?? []).map((m) => ({
     offset: m.offset,
     length: m.length,
     message: m.message,
@@ -102,6 +117,18 @@ export async function check(
       .map((r) => r.value),
     category: categoryFor(m.rule)
   }))
+
+  const localMatches = runLocalRules(safe).filter((local) => {
+    const localEnd = local.offset + local.length
+    return !apiMatches.some((api) => {
+      const apiEnd = api.offset + api.length
+      return local.offset < apiEnd && api.offset < localEnd
+    })
+  })
+
+  const matches = [...apiMatches, ...localMatches].sort(
+    (a, b) => a.offset - b.offset
+  )
 
   return { matches, isEnglish: true }
 }
