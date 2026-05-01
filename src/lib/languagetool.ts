@@ -108,7 +108,7 @@ export async function check(
 
   if (!isEnglish) return { matches: [], isEnglish: false }
 
-  const apiMatches: Match[] = (json.matches ?? []).map((m) => ({
+  const rawMatches: Match[] = (json.matches ?? []).map((m) => ({
     offset: m.offset,
     length: m.length,
     message: m.message,
@@ -118,15 +118,40 @@ export async function check(
     category: categoryFor(m.rule)
   }))
 
-  const localMatches = runLocalRules(safe).filter((local) => {
-    const localEnd = local.offset + local.length
-    return !apiMatches.some((api) => {
-      const apiEnd = api.offset + api.length
+  // Chill mode: drop pure-capitalization suggestions like "claude" -> "Claude".
+  // LT files these under MORFOLOGIK_RULE_EN_US (TYPOS), not CASING, so the
+  // disabled categories don't catch them and the rule itself can't be turned
+  // off without losing all spell-checking.
+  const apiMatches =
+    mode === "chill"
+      ? rawMatches.filter((m) => {
+          if (m.replacements.length === 0) return true
+          const original = safe.slice(m.offset, m.offset + m.length)
+          const originalLower = original.toLowerCase()
+          // If any suggestion is a pure case variant of the original, LT
+          // knows the word and is just nudging capitalization — drop it.
+          // Other near-miss suggestions (e.g. "clause" for "claude") often
+          // appear alongside, so checking "every" is too strict.
+          return !m.replacements.some(
+            (r) => r.toLowerCase() === originalLower
+          )
+        })
+      : rawMatches
+
+  // Curated local rules are conservative and target gaps in the free LT
+  // tier (e.g. missing question inversion). Let them win over overlapping
+  // API matches so a low-value LT note like UPPERCASE_SENTENCE_START
+  // doesn't suppress the more useful local correction.
+  const localMatches = runLocalRules(safe)
+  const filteredApi = apiMatches.filter((api) => {
+    const apiEnd = api.offset + api.length
+    return !localMatches.some((local) => {
+      const localEnd = local.offset + local.length
       return local.offset < apiEnd && api.offset < localEnd
     })
   })
 
-  const matches = [...apiMatches, ...localMatches].sort(
+  const matches = [...filteredApi, ...localMatches].sort(
     (a, b) => a.offset - b.offset
   )
 
