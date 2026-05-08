@@ -1,4 +1,4 @@
-import type { EditableTarget } from "../lib/editable"
+import { traverseEditableContent, type EditableTarget } from "../lib/editable"
 
 const MIRROR_PROPS = [
   "boxSizing",
@@ -122,21 +122,40 @@ export function rectsForInputRange(
   return rects
 }
 
+// Mirrors the traversal used by readText so LanguageTool's character offsets
+// (which include synthetic \n at block boundaries) map to the right text node.
+// If the offset lands on a synthetic newline, we anchor at the end of the
+// preceding text node so Range.setStart/setEnd has a real position.
 function findTextNodeAtOffset(
-  root: Node,
+  root: HTMLElement,
   offset: number
 ): { node: Text; localOffset: number } | null {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
   let remaining = offset
-  let node: Node | null = walker.nextNode()
-  while (node) {
-    const t = node as Text
-    const len = t.data.length
-    if (remaining <= len) return { node: t, localOffset: remaining }
-    remaining -= len
-    node = walker.nextNode()
-  }
-  return null
+  let lastText: Text | null = null
+  let lastTextEnd = 0
+  let result: { node: Text; localOffset: number } | null = null
+
+  traverseEditableContent(root, {
+    onText: (node, text) => {
+      const len = text.length
+      if (remaining <= len) {
+        result = { node, localOffset: remaining }
+        return true
+      }
+      remaining -= len
+      lastText = node
+      lastTextEnd = len
+    },
+    onNewline: () => {
+      if (remaining < 1) {
+        if (lastText) result = { node: lastText, localOffset: lastTextEnd }
+        return true
+      }
+      remaining -= 1
+    }
+  })
+
+  return result
 }
 
 export function rectsForContentEditableRange(
