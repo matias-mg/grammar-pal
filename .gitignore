@@ -1,0 +1,16 @@
+node_modules/
+build/
+.plasmo/
+.parcel-cache/
+keys/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+.claude/
+
+# Env
+.env
+.env.local
+.env.*.local

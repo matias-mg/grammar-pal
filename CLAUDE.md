@@ -3,7 +3,7 @@
 ## What we're building
 A Chrome browser extension (Manifest V3) that:
 - Detects when the user types in any input, textarea, or contenteditable element
-- Debounces input (~800ms) and sends text to LanguageTool's public API
+- Debounces input (~1500ms) and sends text to LanguageTool's public API
   (https://api.languagetool.org/v2/check)
 - Shows colored underlines on detected issues:
   - Red for grammar/spelling errors (TYPOS, GRAMMAR categories)
