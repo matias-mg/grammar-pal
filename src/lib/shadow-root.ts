@@ -91,6 +91,143 @@ const STYLES = `
   }
   .pet__mode--formal { background: #2563eb; }
   .pet__mode--chill  { background: #10b981; }
+
+  .polish-panel {
+    position: fixed;
+    pointer-events: auto;
+    background: #ffffff;
+    color: #1f2328;
+    border: 1px solid #d0d7de;
+    border-radius: 10px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.18);
+    padding: 0;
+    font: 13px/1.45 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    width: 360px;
+    max-width: calc(100vw - 16px);
+    z-index: 2147483647;
+    display: flex;
+    flex-direction: column;
+    max-height: 70vh;
+  }
+  .polish-panel__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-bottom: 1px solid #eaeef2;
+    font-weight: 600;
+  }
+  .polish-panel__close {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 16px;
+    color: #57606a;
+    padding: 0 4px;
+    line-height: 1;
+  }
+  .polish-panel__close:hover { color: #1f2328; }
+  .polish-panel__body {
+    overflow-y: auto;
+    padding: 10px 12px;
+  }
+  .polish-panel__section-label {
+    margin: 4px 0 6px 0;
+    font-size: 11px;
+    color: #57606a;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .polish-panel__preview {
+    margin: 0 0 12px 0;
+    padding: 8px 10px;
+    background: #f6f8fa;
+    border: 1px solid #eaeef2;
+    border-radius: 6px;
+    white-space: pre-wrap;
+    max-height: 140px;
+    overflow-y: auto;
+    font-size: 12px;
+    color: #1f2328;
+  }
+  .polish-card {
+    border: 1px solid #eaeef2;
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin: 0 0 8px 0;
+  }
+  .polish-card--resolved {
+    opacity: 0.55;
+  }
+  .polish-card__original {
+    color: #57606a;
+    text-decoration: line-through;
+    word-break: break-word;
+  }
+  .polish-card__replacement {
+    color: #1f2328;
+    font-weight: 500;
+    margin-top: 2px;
+    word-break: break-word;
+  }
+  .polish-card__arrow {
+    color: #6e7781;
+    margin-right: 4px;
+  }
+  .polish-card__reason {
+    color: #57606a;
+    font-size: 12px;
+    margin: 4px 0 6px 0;
+  }
+  .polish-card__actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+  }
+  .polish-card__status {
+    margin-top: 4px;
+    font-size: 12px;
+    color: #57606a;
+    font-style: italic;
+  }
+  .polish-btn {
+    background: #f6f8fa;
+    color: #1f2328;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .polish-btn:hover { background: #eef1f4; }
+  .polish-btn--primary {
+    background: #1f6feb;
+    border-color: #1f6feb;
+    color: #ffffff;
+  }
+  .polish-btn--primary:hover { background: #1858c4; }
+  .polish-panel__foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    border-top: 1px solid #eaeef2;
+    gap: 8px;
+  }
+
+  .polish-toast {
+    position: fixed;
+    pointer-events: auto;
+    background: rgba(31, 35, 40, 0.92);
+    color: #ffffff;
+    border-radius: 999px;
+    padding: 6px 12px;
+    font: 12px/1.3 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.22);
+    z-index: 2147483647;
+    max-width: 320px;
+  }
 `
 
 export function getShadowRoot(): ShadowRoot {

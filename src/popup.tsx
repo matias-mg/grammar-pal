@@ -65,6 +65,24 @@ function IndexPopup() {
         </label>
       </fieldset>
 
+      <label style={rowStyle}>
+        <span>{strings.polishLabel}</span>
+        <input
+          type="checkbox"
+          checked={settings.polishEnabled}
+          onChange={(e) => {
+            void setSettings({ polishEnabled: e.target.checked })
+          }}
+        />
+      </label>
+      <p style={privacyNoteStyle}>
+        {strings.polishPrivacyPrefix}
+        <a href="#" style={privacyLinkStyle}>
+          {strings.polishPrivacyLink}
+        </a>
+        {strings.polishPrivacySuffix}
+      </p>
+
       <p style={hintStyle}>{strings.popupFooter}</p>
     </main>
   )
@@ -114,6 +132,18 @@ const hintStyle: React.CSSProperties = {
   margin: "12px 0 0 0",
   fontSize: 12,
   color: "#57606a"
+}
+
+const privacyNoteStyle: React.CSSProperties = {
+  margin: "4px 0 0 0",
+  fontSize: 11,
+  color: "#6e7781",
+  lineHeight: 1.4
+}
+
+const privacyLinkStyle: React.CSSProperties = {
+  color: "#6e7781",
+  textDecoration: "underline"
 }
 
 export default IndexPopup
