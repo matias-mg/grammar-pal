@@ -3,28 +3,51 @@
 ## What we're building
 A Chrome browser extension (Manifest V3) that:
 - Detects when the user types in any input, textarea, or contenteditable element
-- Debounces input (~1500ms) and sends text to LanguageTool's public API
-  (https://api.languagetool.org/v2/check)
-- Shows colored underlines on detected issues:
-  - Red for grammar/spelling errors (TYPOS, GRAMMAR categories)
+- Runs **Harper** (Automattic's on-device WASM grammar checker) in the MV3
+  service worker on a 400 ms debounce and renders coloured underlines:
+  - Red for grammar/spelling errors
   - Yellow for style/punctuation suggestions
   - Blue for everything else
 - Pop-up shows replacement suggestions on click
 - Floating SVG pet in the corner with 5 expressions tied to error count
   (happy, neutral, curious, concerned, alarmed)
-- Mode toggle (Formal/Chill) that adjusts which LanguageTool categories are sent
+- Mode toggle (Formal/Chill) that adjusts which categories are reported
+- **Polish to native English (opt-in, Phase 2)** — runs on a 3500 ms debounce
+  or `##` shortcut, sends text to a Cloudflare Worker proxy that calls
+  Gemini 2.5 Flash-Lite, renders a Shadow-DOM panel with per-change
+  Accept / Skip / Accept all / Dismiss controls.
 
 ## Stack (locked in — do not deviate)
 - Plasmo framework (https://www.plasmo.com)
 - TypeScript
 - chrome.storage.local for settings
-- No backend, no auth, no payments — this is Phase 1 prototype only
-- LanguageTool public API directly from the content script
+- Harper (`harper.js`) running locally in the MV3 service worker
+- Cloudflare Worker proxy (Wrangler, TypeScript) holds the Gemini API key.
+  Repo path: `backend/proxy/`.
 
-## Out of scope for Phase 1
-- LLM integration (Phase 2 only, behind paywall)
+## Dual-engine architecture (do not conflate)
+
+Grammar Pal runs two engines simultaneously. They are wired into the same
+content-script input listener for event-efficiency but are otherwise fully
+independent. Never route work across the boundary.
+
+- **Harper** (local WASM, always-on). Lives in `src/background.ts`. Fires on
+  the 400 ms debounce (key `"default"`). Produces grammar/spelling
+  underlines. No network, no opt-in.
+- **Gemini polish** (network, opt-in). Lives in `src/lib/engine-polish.ts`
+  + Cloudflare Worker at `backend/proxy/`. Fires on the 3500 ms debounce
+  (key `"polish"`) OR the `##` shortcut. Produces the polish panel with
+  per-change Accept/Skip controls. Default off.
+
+Hard rules:
+1. Harper is never used for polish suggestions.
+2. Gemini is never used for grammar underlining.
+3. The two engines have independent debounce keys, AbortController maps,
+   inflight state, and UI overlays.
+4. Deleting one engine must not break the other.
+
+## Out of scope (still)
 - User accounts, Stripe, billing
-- Self-hosted LanguageTool server
 - Firefox/Safari ports
 - Pet customization/multiple pets (single pet, 5 expressions only)
 - Google Docs and other canvas-based editors
