@@ -5,8 +5,8 @@
   "description": "Live grammar/style underlines on any editable field, plus a corner pet that reacts to your errors.",
   "author": "Grammar Pal",
   "scripts": {
-    "dev": "node scripts/dev.mjs",
-    "build": "plasmo build && node scripts/fix-underscore-files.mjs",
+    "dev": "plasmo dev",
+    "build": "plasmo build",
     "package": "plasmo package",
     "test": "vitest run src/lib/languagetool.test.ts",
     "test:harper:eval": "vitest run --reporter=verbose src/lib/harper.evaluation.test.ts"
@@ -24,6 +24,9 @@
     "@types/react-dom": "18.2.18",
     "typescript": "5.3.3",
     "vitest": "^4.1.5"
+  },
+  "alias": {
+    "fs": "./scripts/empty-fs.js"
   },
   "manifest": {
     "permissions": [
