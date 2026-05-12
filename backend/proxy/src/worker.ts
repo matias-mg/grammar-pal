@@ -2,7 +2,7 @@ import { RESPONSE_SCHEMA, SYSTEM_PROMPT } from "./prompt"
 
 export type Env = {
   GEMINI_API_KEY: string
-  RATE_LIMITER: { limit: (opts: { key: string }) => Promise<{ success: boolean }> }
+  RATE_LIMITER?: { limit: (opts: { key: string }) => Promise<{ success: boolean }> }
 }
 
 const MAX_INPUT_CHARS = 8000
@@ -122,10 +122,12 @@ export default {
       return json({ error: "unsupported_media_type" }, 415, origin)
     }
 
-    const ip = request.headers.get("cf-connecting-ip") ?? "unknown"
-    const { success } = await env.RATE_LIMITER.limit({ key: ip })
-    if (!success) {
-      return json({ error: "rate_limited" }, 429, origin, { "Retry-After": "60" })
+    if (env.RATE_LIMITER) {
+      const ip = request.headers.get("cf-connecting-ip") ?? "unknown"
+      const { success } = await env.RATE_LIMITER.limit({ key: ip })
+      if (!success) {
+        return json({ error: "rate_limited" }, 429, origin, { "Retry-After": "60" })
+      }
     }
 
     let body: unknown

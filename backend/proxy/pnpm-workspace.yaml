@@ -1,0 +1,7 @@
+allowBuilds:
+  esbuild: true
+  sharp: true
+  workerd: true
+overrides:
+  esbuild@<0.25.0: ^0.25.0
+  undici@<6.24.0: ^6.24.0
