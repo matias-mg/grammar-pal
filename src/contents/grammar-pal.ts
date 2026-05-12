@@ -2,7 +2,7 @@ import type { PlasmoCSConfig } from "plasmo"
 
 import { debounceForElement } from "../lib/debounce"
 import { classifyEditable, readText, type EditableTarget } from "../lib/editable"
-import { check } from "../lib/languagetool"
+import { check } from "../lib/engine"
 import { getSettings, onSettingsChange } from "../lib/storage"
 import { DEFAULT_SETTINGS, type Settings } from "../lib/types"
 import { applyReplacement } from "../overlay/apply-replacement"

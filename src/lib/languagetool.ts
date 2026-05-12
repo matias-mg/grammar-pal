@@ -82,6 +82,7 @@ export async function check(
   params.set("text", safe)
   params.set("language", "auto")
   params.set("preferredVariants", "en-US")
+  params.set("level", "picky")
   if (mode === "chill") {
     params.set("disabledCategories", CHILL_DISABLED_CATEGORIES)
     params.set("disabledRules", CHILL_DISABLED_RULES)
