@@ -1,3 +1,8 @@
+// This service worker hosts the HARPER engine (local WASM, always-on grammar
+// underlining). It also forwards POLISH requests to the Cloudflare Worker
+// proxy. The two engines are independent — never route Harper through Gemini,
+// or polish through Harper. See CLAUDE.md "Dual-engine architecture".
+//
 // Parcel (Plasmo's bundler) doesn't resolve the harper.js package.json
 // "exports" map cleanly — neither the bare specifier nor subpath like
 // "harper.js/binaryInlined" works. Import the dist files directly.
@@ -5,8 +10,10 @@ import { Dialect, LocalLinter, type Lint } from "harper.js/dist/index.js"
 import { binaryInlined } from "harper.js/dist/binaryInlined.js"
 
 import type { LintRequest, LintResponse } from "./lib/engine"
+import type { PolishRequest } from "./lib/engine-polish"
 import { runLocalRules } from "./lib/local-rules"
 import type { Category, Match } from "./lib/types"
+import type { PolishResult } from "./types/polish"
 
 const MAX_TEXT_LENGTH = 12_000
 const MIN_TEXT_LENGTH = 5
@@ -80,13 +87,48 @@ async function lint(text: string): Promise<LintResponse> {
   return { matches, isEnglish: true }
 }
 
-chrome.runtime.onMessage.addListener(
-  (msg: LintRequest, _sender, sendResponse) => {
-    if (msg?.type !== "lint") return false
-    lint(msg.text).then(sendResponse, (err) => {
-      console.warn("[grammar-pal] lint failed", err)
-      sendResponse({ matches: [], isEnglish: false } satisfies LintResponse)
+async function polishViaProxy(text: string): Promise<PolishResult | null> {
+  const url = process.env.PLASMO_PUBLIC_POLISH_URL
+  if (!url) return null
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text })
     })
-    return true
+    if (!res.ok) return null
+    const data = (await res.json()) as PolishResult
+    if (typeof data?.rewritten !== "string" || !Array.isArray(data?.changes)) {
+      return null
+    }
+    return data
+  } catch (err) {
+    console.warn("[grammar-pal] polish failed", err)
+    return null
+  }
+}
+
+type IncomingMessage = LintRequest | PolishRequest
+
+chrome.runtime.onMessage.addListener(
+  (msg: IncomingMessage, _sender, sendResponse) => {
+    if (msg?.type === "lint") {
+      lint(msg.text).then(sendResponse, (err) => {
+        console.warn("[grammar-pal] lint failed", err)
+        sendResponse({ matches: [], isEnglish: false } satisfies LintResponse)
+      })
+      return true
+    }
+    if (msg?.type === "polish") {
+      polishViaProxy(msg.text).then(
+        (result) => sendResponse(result),
+        (err) => {
+          console.warn("[grammar-pal] polish failed", err)
+          sendResponse(null)
+        }
+      )
+      return true
+    }
+    return false
   }
 )

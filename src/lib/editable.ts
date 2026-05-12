@@ -107,3 +107,51 @@ export function readText(target: EditableTarget): string {
   }
   return target.el.value
 }
+
+// Strip `marker` from the very end of the field and fire a synthetic native
+// `input` event so host frameworks (React-controlled inputs, character
+// counters, etc.) re-read the field. Used by the polish "##" shortcut path
+// so the marker never lands in the user's submitted text.
+export function stripTrailingMarker(
+  target: EditableTarget,
+  marker: string
+): void {
+  if (marker.length === 0) return
+
+  if (target.kind === "input" || target.kind === "textarea") {
+    const el = target.el
+    if (!el.value.endsWith(marker)) return
+    const next = el.value.slice(0, -marker.length)
+    const proto =
+      target.kind === "textarea"
+        ? HTMLTextAreaElement.prototype
+        : HTMLInputElement.prototype
+    const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set
+    if (setter) setter.call(el, next)
+    else el.value = next
+    el.dispatchEvent(new Event("input", { bubbles: true }))
+    return
+  }
+
+  const root = target.el
+  let remaining = marker.length
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  const tail: Text[] = []
+  let n: Node | null = walker.nextNode()
+  while (n) {
+    tail.push(n as Text)
+    n = walker.nextNode()
+  }
+  for (let i = tail.length - 1; i >= 0 && remaining > 0; i--) {
+    const t = tail[i]
+    if (!t || t.data.length === 0) continue
+    if (t.data.length >= remaining) {
+      t.data = t.data.slice(0, t.data.length - remaining)
+      remaining = 0
+    } else {
+      remaining -= t.data.length
+      t.data = ""
+    }
+  }
+  root.dispatchEvent(new InputEvent("input", { bubbles: true }))
+}
