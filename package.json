@@ -5,7 +5,7 @@
   "description": "Live grammar/style underlines on any editable field, plus a corner pet that reacts to your errors.",
   "author": "Grammar Pal",
   "scripts": {
-    "dev": "plasmo dev",
+    "dev": "node scripts/dev.mjs",
     "build": "plasmo build && node scripts/fix-underscore-files.mjs",
     "package": "plasmo package",
     "test": "vitest run src/lib/languagetool.test.ts",

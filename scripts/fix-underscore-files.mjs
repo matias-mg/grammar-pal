@@ -34,7 +34,7 @@ async function walk(dir) {
   return out
 }
 
-async function fixDir(root) {
+export async function fixDir(root) {
   const files = await walk(root)
   if (files.length === 0) return false
 
@@ -73,11 +73,16 @@ async function fixDir(root) {
   return true
 }
 
-let touched = false
-for (const dir of buildDirs) {
-  const did = await fixDir(dir)
-  touched = touched || did
-}
-if (!touched) {
-  console.log("[fix-underscore-files] no underscore-prefixed files found")
+const invokedDirectly =
+  process.argv[1] && process.argv[1].replace(/\\/g, "/").endsWith("fix-underscore-files.mjs")
+
+if (invokedDirectly) {
+  let touched = false
+  for (const dir of buildDirs) {
+    const did = await fixDir(dir)
+    touched = touched || did
+  }
+  if (!touched) {
+    console.log("[fix-underscore-files] no underscore-prefixed files found")
+  }
 }
