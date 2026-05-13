@@ -14,7 +14,7 @@ A Chrome browser extension (Manifest V3) that:
 - Mode toggle (Formal/Chill) that adjusts which categories are reported
 - **Polish to native English (opt-in, Phase 2)** — runs on a 3500 ms debounce
   or `##` shortcut, sends text to a Cloudflare Worker proxy that calls
-  Gemini 2.5 Flash-Lite, renders a Shadow-DOM panel with per-change
+  Gemma 4 26B, renders a Shadow-DOM panel with per-change
   Accept / Skip / Accept all / Dismiss controls.
 
 ## Stack (locked in — do not deviate)

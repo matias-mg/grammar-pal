@@ -14,7 +14,7 @@ A Chrome (Manifest V3) extension that underlines grammar/style issues in any edi
 
 ## Polish (optional)
 
-A second, opt-in engine that rewrites your text to sound more native by calling Gemini 2.5 Flash-Lite through a self-hosted Cloudflare Worker proxy.
+A second, opt-in engine that rewrites your text to sound more native by calling Gemma 4 26B through a self-hosted Cloudflare Worker proxy.
 
 - **Off by default.** Enable in the popup ("Polish to native (uses AI, opt-in)").
 - **Two triggers** once enabled:
@@ -75,7 +75,9 @@ src/
     underlines.ts              # Render and reposition underline spans
     suggestion-popup.ts        # Click-to-apply replacement panel
     apply-replacement.ts       # setRangeText / native setter / execCommand
-    polish-panel.ts            # Per-change Accept/Skip/Accept all panel
+    polish-underlines.ts       # Animated Gemini-gradient underlines per change
+    polish-popover.ts          # Per-chunk Accept/Skip popover
+    polish-offsets.ts          # Compute change offsets via in-order indexOf
     polish-toast.ts            # Auto-dismissing error toast
   pet/
     pet.ts                     # Pet mount + expression swap
