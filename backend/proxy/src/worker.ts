@@ -8,7 +8,7 @@ export type Env = {
 const MAX_INPUT_CHARS = 8000
 
 const GEMINI_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent"
+  "https://generativelanguage.googleapis.com/v1beta/models/gemma-4-26b-a4b-it:generateContent"
 
 type PolishChange = {
   original: string
@@ -83,17 +83,36 @@ async function callGemini(text: string, apiKey: string): Promise<PolishResult | 
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
   })
-  if (!res.ok) return null
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => "<unreadable>")
+    console.warn(
+      `[polish] gemini http ${res.status} ${res.statusText} body=${errBody.slice(0, 500)}`
+    )
+    return null
+  }
   const data = (await res.json()) as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>
+    candidates?: Array<{
+      content?: { parts?: Array<{ text?: string }> }
+      finishReason?: string
+    }>
+    promptFeedback?: { blockReason?: string }
   }
   const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text
-  if (!raw) return null
+  if (!raw) {
+    console.warn(
+      `[polish] gemini empty candidate finish=${data?.candidates?.[0]?.finishReason} block=${data?.promptFeedback?.blockReason}`
+    )
+    return null
+  }
   try {
     const parsed = JSON.parse(raw)
-    if (!validResult(parsed)) return null
+    if (!validResult(parsed)) {
+      console.warn(`[polish] gemini invalid shape raw=${raw.slice(0, 500)}`)
+      return null
+    }
     return parsed
-  } catch {
+  } catch (err) {
+    console.warn(`[polish] gemini json parse fail: ${(err as Error).message}`)
     return null
   }
 }

@@ -59,4 +59,4 @@ Response body (200):
 }
 ```
 
-Per-IP rate limit: 20 req/min via Cloudflare's `RATE_LIMITER` binding.
+Per-IP rate limit: 5 req/min via Cloudflare's `RATE_LIMITER` binding.
