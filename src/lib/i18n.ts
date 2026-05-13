@@ -16,7 +16,18 @@ export const strings = {
   petTooltipNeutral: "A couple things to look at.",
   petTooltipCurious: "Some issues found.",
   petTooltipConcerned: "Several issues to fix.",
-  petTooltipAlarmed: "Lots of issues — take a look."
+  petTooltipAlarmed: "Lots of issues — take a look.",
+
+  polishLabel: "Polish to native (uses AI, opt-in)",
+  polishPrivacyPrefix: "Your text is sent to Google's AI. See ",
+  polishPrivacyLink: "privacy policy",
+  polishPrivacySuffix: ".",
+  polishTitle: "Polish to native English",
+  polishAccept: "Accept",
+  polishSkip: "Skip",
+  polishLoading: "AI checking...",
+  polishPopoverAriaLabel: "Polish suggestion",
+  polishToastError: "Polish unavailable, try again shortly"
 } as const
 
 export type StringKey = keyof typeof strings

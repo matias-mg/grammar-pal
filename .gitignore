@@ -14,3 +14,7 @@ keys/
 .env
 .env.local
 .env.*.local
+
+# Cloudflare Worker secrets
+backend/proxy/.dev.vars
+backend/proxy/.wrangler/

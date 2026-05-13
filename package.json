@@ -7,9 +7,12 @@
   "scripts": {
     "dev": "plasmo dev",
     "build": "plasmo build",
-    "package": "plasmo package"
+    "package": "plasmo package",
+    "test": "vitest run src/lib/languagetool.test.ts",
+    "test:harper:eval": "vitest run --reporter=verbose src/lib/harper.evaluation.test.ts"
   },
   "dependencies": {
+    "harper.js": "^2.0.0",
     "plasmo": "0.90.5",
     "react": "18.2.0",
     "react-dom": "18.2.0"
@@ -19,14 +22,21 @@
     "@types/node": "20.11.5",
     "@types/react": "18.2.48",
     "@types/react-dom": "18.2.18",
-    "typescript": "5.3.3"
+    "typescript": "5.3.3",
+    "vitest": "^4.1.5"
+  },
+  "alias": {
+    "fs": "./scripts/empty-fs.js"
   },
   "manifest": {
     "permissions": [
       "storage"
     ],
     "host_permissions": [
-      "https://api.languagetool.org/*"
-    ]
+      "https://grammar-pal-polish.*.workers.dev/*"
+    ],
+    "content_security_policy": {
+      "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+    }
   }
 }
