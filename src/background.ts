@@ -17,6 +17,8 @@ import type { PolishResult } from "./types/polish"
 
 const MAX_TEXT_LENGTH = 12_000
 const MIN_TEXT_LENGTH = 5
+const MAX_POLISH_REQUESTS_PER_MINUTE = 5
+const POLISH_RATE_WINDOW_MS = 60_000
 
 const linter = new LocalLinter({
   binary: binaryInlined,
@@ -24,6 +26,8 @@ const linter = new LocalLinter({
 })
 
 let setupPromise: Promise<void> | null = null
+const polishRequestTimes: number[] = []
+const polishInFlight = new Map<string, Promise<PolishResult | null>>()
 
 function ensureSetup(): Promise<void> {
   if (setupPromise) return setupPromise
@@ -90,6 +94,37 @@ async function lint(text: string): Promise<LintResponse> {
 async function polishViaProxy(text: string): Promise<PolishResult | null> {
   const url = process.env.PLASMO_PUBLIC_POLISH_URL
   if (!url) return null
+
+  const existing = polishInFlight.get(text)
+  if (existing) return existing
+
+  if (!reservePolishRequestSlot()) return null
+
+  const request = fetchPolishViaProxy(url, text)
+  polishInFlight.set(text, request)
+  try {
+    return await request
+  } finally {
+    polishInFlight.delete(text)
+  }
+}
+
+function reservePolishRequestSlot(now = Date.now()): boolean {
+  const cutoff = now - POLISH_RATE_WINDOW_MS
+  while (polishRequestTimes.length > 0 && polishRequestTimes[0]! <= cutoff) {
+    polishRequestTimes.shift()
+  }
+  if (polishRequestTimes.length >= MAX_POLISH_REQUESTS_PER_MINUTE) {
+    return false
+  }
+  polishRequestTimes.push(now)
+  return true
+}
+
+async function fetchPolishViaProxy(
+  url: string,
+  text: string
+): Promise<PolishResult | null> {
   try {
     const res = await fetch(url, {
       method: "POST",
