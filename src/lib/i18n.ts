@@ -23,15 +23,10 @@ export const strings = {
   polishPrivacyLink: "privacy policy",
   polishPrivacySuffix: ".",
   polishTitle: "Polish to native English",
-  polishRewriteHeader: "Suggested rewrite (preview):",
-  polishChangesHeader: "Changes",
   polishAccept: "Accept",
   polishSkip: "Skip",
-  polishAcceptAll: "Accept all",
-  polishDismiss: "Dismiss",
-  polishCardApplied: "✓ applied",
-  polishCardSkipped: "skipped",
-  polishCardNotFound: "✓ (already applied or no longer present)",
+  polishLoading: "AI checking...",
+  polishPopoverAriaLabel: "Polish suggestion",
   polishToastError: "Polish unavailable, try again shortly"
 } as const
 
