@@ -14,6 +14,10 @@ const STYLES = `
     --gp-grammar: #e5484d;
     --gp-style:   #f5a524;
     --gp-other:   #3b82f6;
+    --gp-polish-gradient: linear-gradient(
+      270deg,
+      #4285F4, #9B72CB, #D96570, #F9AB00, #4285F4
+    );
   }
   .u {
     position: fixed;
@@ -26,25 +30,38 @@ const STYLES = `
   .u--grammar { color: var(--gp-grammar); }
   .u--style   { color: var(--gp-style); }
   .u--other   { color: var(--gp-other); }
+  .u--grammar,
+  .u--style,
+  .u--other {
+    z-index: 2;
+  }
 
   @keyframes gp-polish-flow {
-    0%   { background-position: 0% 50%; }
-    100% { background-position: 200% 50%; }
+    0%   { background-position: 200% 100%; }
+    100% { background-position: 0% 100%; }
   }
   .u--polish {
     border-bottom: none;
-    background-image: linear-gradient(
-      270deg,
-      #4285F4, #9B72CB, #D96570, #F9AB00, #4285F4
-    );
+    background: transparent;
+    border-radius: 1px;
+    opacity: 1;
+    z-index: 3;
+  }
+  .u--polish::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -3px;
+    height: 3px;
+    background-image: var(--gp-polish-gradient);
     background-size: 200% 100%;
     background-repeat: repeat-x;
     border-radius: 1px;
-    opacity: 0.85;
     animation: gp-polish-flow 3s linear infinite;
   }
   @media (prefers-reduced-motion: reduce) {
-    .u--polish { animation: none; }
+    .u--polish::after { animation: none; }
   }
 
   .polish-popover {
@@ -182,9 +199,9 @@ const STYLES = `
     max-width: 320px;
   }
 
-  @keyframes gp-polish-pulse {
-    0%, 100% { transform: scale(0.72); opacity: 0.52; }
-    50% { transform: scale(1); opacity: 1; }
+  @keyframes gp-polish-border-flow {
+    0%   { background-position: 0 0, 200% 50%; }
+    100% { background-position: 0 0, 0% 50%; }
   }
 
   .polish-loading {
@@ -192,27 +209,23 @@ const STYLES = `
     pointer-events: none;
     display: inline-flex;
     align-items: center;
-    gap: 7px;
-    background: rgba(255, 255, 255, 0.96);
-    color: #1f2328;
-    border: 1px solid #d0d7de;
+    background:
+      linear-gradient(rgba(18, 20, 27, 0.96), rgba(18, 20, 27, 0.96)) padding-box,
+      var(--gp-polish-gradient) border-box;
+    background-size: 100% 100%, 200% 100%;
+    background-position: 0 0, 200% 50%;
+    color: #ffffff;
+    border: 1px solid transparent;
     border-radius: 999px;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.14);
-    padding: 6px 10px;
+    box-shadow: 0 7px 22px rgba(0,0,0,0.22);
+    padding: 6px 11px;
     font: 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
     z-index: 2147483647;
     white-space: nowrap;
+    animation: gp-polish-border-flow 2.4s linear infinite;
   }
-  .polish-loading::before {
-    content: "";
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #4285f4;
-    box-shadow: 9px 0 0 #d96570, 18px 0 0 #f9ab00;
-    margin-right: 18px;
-    transform-origin: center;
-    animation: gp-polish-pulse 900ms ease-in-out infinite;
+  @media (prefers-reduced-motion: reduce) {
+    .polish-loading { animation: none; }
   }
 `
 

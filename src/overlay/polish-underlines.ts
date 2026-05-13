@@ -158,14 +158,12 @@ function applyBandRect(
   span: HTMLSpanElement,
   rect: { left: number; top: number; width: number; height: number }
 ): void {
-  // Render as a 2px band sitting at the text baseline rather than overlaying
-  // the full line height — keeps the gradient reading clearly as an underline
-  // and avoids covering the text itself.
-  const bandHeight = 2
+  // Match Harper's underline box so AI polish can replace it visually when
+  // both engines flag the same text.
   span.style.left = `${rect.left}px`
-  span.style.top = `${rect.top + rect.height - bandHeight}px`
+  span.style.top = `${rect.top}px`
   span.style.width = `${rect.width}px`
-  span.style.height = `${bandHeight}px`
+  span.style.height = `${rect.height}px`
 }
 
 function repositionState(state: TargetState): void {
