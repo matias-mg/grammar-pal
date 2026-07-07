@@ -21,10 +21,20 @@ import {
   type EditableTarget
 } from "../lib/editable"
 import { check } from "../lib/engine"
-import { polish } from "../lib/engine-polish"
-import { getSettings, onSettingsChange } from "../lib/storage"
+import {
+  getPolishBackend,
+  polish,
+  triggerLocalAiDownload,
+  type PolishBackendKind
+} from "../lib/engine-polish"
+import { getSettings, onSettingsChange, setSettings } from "../lib/storage"
 import { DEFAULT_SETTINGS, type Settings } from "../lib/types"
 import { applyReplacement } from "../overlay/apply-replacement"
+import {
+  dismissLocalAiModal,
+  isLocalAiModalOpen,
+  showLocalAiModal
+} from "../overlay/local-ai-modal"
 import {
   dismissPolishPopover,
   showPolishPopover
@@ -71,7 +81,8 @@ const DEBOUNCE_MS = 400
 const MIN_TEXT_LENGTH = 5
 const RECHECK_DELAY_MS = 50
 
-const POLISH_DEBOUNCE_MS = 3500
+const POLISH_DEBOUNCE_GEMINI_MS = 3500
+const POLISH_DEBOUNCE_PROMPT_API_MS = 1500
 const MIN_POLISH_LENGTH = 10
 const POLISH_CHANGE_THRESHOLD = 0.03
 const POLISH_TRIGGER = "##"
@@ -79,6 +90,9 @@ const POLISH_FOCUSOUT_GRACE_MS = 500
 const CONTENT_INSTANCE_KEY = "__grammarPalContentInstance"
 
 let settings: Settings = DEFAULT_SETTINGS
+let polishBackend: PolishBackendKind = "gemini"
+let polishDebounceMs = POLISH_DEBOUNCE_GEMINI_MS
+let modalShownThisSession = false
 const inflight = new WeakMap<Element, AbortController>()
 const knownTargets = new Set<EditableTarget>()
 const lastCount = new WeakMap<Element, number>()
@@ -171,6 +185,14 @@ function init(): () => void {
     setPetMode(s.mode)
     applyEnabledState()
   })
+  void getPolishBackend().then((backend) => {
+    if (listenerAbort.signal.aborted) return
+    polishBackend = backend
+    polishDebounceMs =
+      backend === "prompt-api"
+        ? POLISH_DEBOUNCE_PROMPT_API_MS
+        : POLISH_DEBOUNCE_GEMINI_MS
+  })
   const unsubscribeSettings = onSettingsChange((s) => {
     if (listenerAbort.signal.aborted) return
     const prev = settings
@@ -178,7 +200,10 @@ function init(): () => void {
     setPetMode(s.mode)
     applyEnabledState()
     if (s.enabled && s.mode !== prev.mode) recheckAll()
-    if (!s.polishEnabled) clearAllPolish()
+    if (!s.polishEnabled) {
+      clearAllPolish()
+      dismissLocalAiModal()
+    }
   })
 
   setPolishUnderlineInteractionStartHandler(() => {
@@ -317,13 +342,16 @@ function init(): () => void {
         return
       }
 
-      // Path A — 3.5 s debounce (subject to 3 % gate inside runPolish).
+      // Path A — debounced polish (1.5 s for Prompt API / 3.5 s for Gemini),
+      // subject to 3 % gate inside runPolish.
       debounceForElement(
         target.el,
         () => void runPolish(target, readText(target), false),
-        POLISH_DEBOUNCE_MS,
+        polishDebounceMs,
         "polish"
       )
+
+      maybeOfferLocalAiDownload()
     },
     { capture: true, signal: listenerAbort.signal }
   )
@@ -375,6 +403,7 @@ function init(): () => void {
     setPolishUnderlineInteractionStartHandler(null)
     clearAll()
     clearAllPolish()
+    dismissLocalAiModal()
     hidePet()
     if (focusedTarget) {
       detachMutationObserver(focusedTarget.el)
@@ -409,6 +438,27 @@ function clearAllPolish() {
   }
   hideAllPolishLoading()
   dismissPolishPopover()
+}
+
+function maybeOfferLocalAiDownload(): void {
+  if (modalShownThisSession) return
+  if (!settings.polishEnabled) return
+  if (polishBackend !== "downloadable") return
+  if (settings.localAiDownloadChoice !== null) return
+  if (isLocalAiModalOpen()) return
+  modalShownThisSession = true
+  showLocalAiModal({
+    onAccept: async () => {
+      await setSettings({ localAiDownloadChoice: "accepted" })
+      // Fire-and-forget: the download can take a long time. The cached
+      // backend will flip to "prompt-api" once the worker finishes, and the
+      // 1.5 s debounce will kick in on the next browser session.
+      void triggerLocalAiDownload()
+    },
+    onReject: async () => {
+      await setSettings({ localAiDownloadChoice: "rejected" })
+    }
+  })
 }
 
 function findTrailingPolishTrigger(text: string): number {
