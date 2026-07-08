@@ -1,14 +1,23 @@
 import { useEffect, useState } from "react"
 
+import {
+  getPolishBackend,
+  type PolishBackendKind
+} from "./lib/engine-polish"
 import { strings } from "./lib/i18n"
 import { getSettings, onSettingsChange, setSettings } from "./lib/storage"
 import type { Settings } from "./lib/types"
 
+const isEdge =
+  typeof navigator !== "undefined" && navigator.userAgent.includes("Edg/")
+
 function IndexPopup() {
   const [settings, setLocal] = useState<Settings | null>(null)
+  const [backend, setBackend] = useState<PolishBackendKind>("gemini")
 
   useEffect(() => {
     void getSettings().then(setLocal)
+    void getPolishBackend().then(setBackend)
     const unsub = onSettingsChange(setLocal)
     return unsub
   }, [])
@@ -75,13 +84,42 @@ function IndexPopup() {
           }}
         />
       </label>
-      <p style={privacyNoteStyle}>
-        {strings.polishPrivacyPrefix}
-        <a href="#" style={privacyLinkStyle}>
-          {strings.polishPrivacyLink}
-        </a>
-        {strings.polishPrivacySuffix}
-      </p>
+      {backend === "prompt-api" ? (
+        <p style={privacyNoteStyle}>{strings.popupPolishPrivacyLocal}</p>
+      ) : (
+        <>
+          <p style={privacyNoteStyle}>
+            {strings.polishPrivacyPrefix}
+            <a href="#" style={privacyLinkStyle}>
+              {strings.polishPrivacyLink}
+            </a>
+            {strings.polishPrivacySuffix}
+          </p>
+          {isEdge && (
+            <p style={privacyNoteStyle}>
+              {strings.edgeLocalAiHintPrefix}
+              <a
+                href={strings.edgeLocalAiHintCanaryUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={privacyLinkStyle}>
+                {strings.edgeLocalAiHintCanaryLink}
+              </a>
+              {strings.edgeLocalAiHintMiddle}
+              <a
+                href={strings.edgeLocalAiHintFlagUrl}
+                onClick={(e) => {
+                  e.preventDefault()
+                  chrome.tabs.create({ url: strings.edgeLocalAiHintFlagUrl })
+                }}
+                style={privacyLinkStyle}>
+                {strings.edgeLocalAiHintFlagLink}
+              </a>
+              {strings.edgeLocalAiHintSuffix}
+            </p>
+          )}
+        </>
+      )}
 
       <p style={hintStyle}>{strings.popupFooter}</p>
     </main>
