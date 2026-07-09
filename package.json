@@ -33,7 +33,7 @@
       "storage"
     ],
     "host_permissions": [
-      "https://grammar-pal-polish.*.workers.dev/*"
+      "https://*.workers.dev/*"
     ],
     "content_security_policy": {
       "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
