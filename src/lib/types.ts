@@ -12,7 +12,7 @@ export type Settings = {
 export const DEFAULT_SETTINGS: Settings = {
   enabled: true,
   mode: "formal",
-  polishEnabled: false,
+  polishEnabled: true,
   localAiDownloadChoice: null
 }
 
