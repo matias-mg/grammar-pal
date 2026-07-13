@@ -6,7 +6,13 @@ export const strings = {
   enabledLabel: "Enabled",
   modeLabel: "Mode",
   modeFormal: "Formal",
+  modeFormalDescription: "Stricter checks for work, school, and polished writing.",
   modeChill: "Chill",
+  modeChillDescription: "Lighter suggestions that keep casual wording and tone.",
+  palLabel: "Pal",
+  palCurrentName: "Classic Pal",
+  palCurrentDescription: "Your writing buddy for now.",
+  palPickerSoon: "More pals later",
 
   applyLabel: "Apply",
   noSuggestions: "No suggestions available.",
@@ -19,7 +25,11 @@ export const strings = {
   petTooltipAlarmed: "Lots of issues — take a look.",
 
   polishLabel: "Polish to native (uses AI, opt-in)",
-  polishPrivacyPrefix: "Your text is sent to Google's AI. See ",
+  polishCloudBadge: "Cloud AI active",
+  polishCloudTitle: "Works fine, but local AI is better",
+  polishCloudBody:
+    "Polish suggestions are currently processed by Google's AI. This is okay to use, but local AI is faster and keeps your text on this device.",
+  polishPrivacyPrefix: "See Google's ",
   polishPrivacyLink: "privacy policy",
   polishPrivacySuffix: ".",
   polishTitle: "Polish to native English",
@@ -45,7 +55,7 @@ export const strings = {
   popupPolishPrivacyLocal:
     "Running locally via your browser's built-in AI — your text never leaves your device.",
 
-  edgeLocalAiHintPrefix: "Using cloud AI. To enable on-device AI on Edge, install ",
+  edgeLocalAiHintPrefix: "To use local AI on Edge, install ",
   edgeLocalAiHintCanaryLink: "Edge Canary or Dev",
   edgeLocalAiHintCanaryUrl: "https://www.microsoft.com/edge/download/insider",
   edgeLocalAiHintMiddle: " and enable ",
