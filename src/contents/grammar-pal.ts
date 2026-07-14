@@ -27,6 +27,10 @@ import {
   triggerLocalAiDownload,
   type PolishBackendKind
 } from "../lib/engine-polish"
+import {
+  isMeaningfulPolishChange,
+  rememberPolishText
+} from "../lib/polish-state"
 import { getSettings, onSettingsChange, setSettings } from "../lib/storage"
 import { DEFAULT_SETTINGS, type Settings } from "../lib/types"
 import { applyReplacement } from "../overlay/apply-replacement"
@@ -101,6 +105,11 @@ let focusedTarget: EditableTarget | null = null
 
 const polishInflight = new WeakMap<Element, AbortController>()
 const lastPolishedText = new WeakMap<Element, string>()
+const polishTextHistory = new WeakMap<Element, Set<string>>()
+// Host editors may echo an accepted replacement through a later input or DOM
+// mutation. Matching the resulting text is durable; a microtask-only flag is
+// not, especially in React and ProseMirror editors.
+const expectedAppliedPolishText = new WeakMap<Element, string>()
 const lastSeenText = new WeakMap<Element, string>()
 // Suppresses the input-listener clear for the synthetic input event fired by
 // applyReplacement when we accept a polish change — otherwise the act of
@@ -114,6 +123,28 @@ const applyingPolish = new WeakSet<Element>()
 // DOM mutation directly and runs the same cleanup path.
 const domObservers = new WeakMap<Element, MutationObserver>()
 let lastPolishInteractionAt = 0
+
+function rememberSettledPolishText(el: Element, text: string): void {
+  let history = polishTextHistory.get(el)
+  if (!history) {
+    history = new Set<string>()
+    polishTextHistory.set(el, history)
+  }
+  rememberPolishText(history, text)
+  lastPolishedText.set(el, text)
+}
+
+function hasSettledPolishText(el: Element, text: string): boolean {
+  return polishTextHistory.get(el)?.has(text) ?? false
+}
+
+function isExpectedPolishApplication(el: Element, text: string): boolean {
+  const expected = expectedAppliedPolishText.get(el)
+  if (expected === undefined) return false
+  if (expected === text) return true
+  if (!applyingPolish.has(el)) expectedAppliedPolishText.delete(el)
+  return false
+}
 
 type ContentInstance = {
   cleanup: () => void
@@ -146,7 +177,9 @@ function handleEditableMutation(target: EditableTarget): void {
   if (lastSeenText.get(target.el) === text) return
   lastSeenText.set(target.el, text)
 
-  const isApplying = applyingPolish.has(target.el)
+  const isApplying =
+    applyingPolish.has(target.el) ||
+    isExpectedPolishApplication(target.el, text)
 
   dismissSuggestionPopup()
   clearUnderlines(target)
@@ -242,6 +275,13 @@ function init(): () => void {
             removePolishAnchor(target, anchor)
             return
           }
+          const nextText =
+            current.slice(0, anchor.offset) +
+            anchor.change.replacement +
+            current.slice(anchor.offset + anchor.length)
+          expectedAppliedPolishText.set(target.el, nextText)
+          cancelDebounceForElement(target.el, "polish")
+          polishInflight.get(target.el)?.abort()
           applyingPolish.add(target.el)
           try {
             applyReplacement(
@@ -250,6 +290,12 @@ function init(): () => void {
               anchor.offset + anchor.length,
               anchor.change.replacement
             )
+            const appliedText = readText(target)
+            if (appliedText === nextText) {
+              rememberSettledPolishText(target.el, appliedText)
+            } else {
+              expectedAppliedPolishText.delete(target.el)
+            }
           } finally {
             queueMicrotask(() => applyingPolish.delete(target.el))
           }
@@ -273,12 +319,15 @@ function init(): () => void {
       if (!settings.enabled) return
       const target = classifyEditable(event.target)
       if (!target) return
+      const text = readText(target)
 
       // Synthetic input event from applyReplacement when accepting a polish
       // chunk — preserve remaining polish underlines and don't kick the
       // polish debounce. Harper still clears and re-checks normally so its
       // offsets stay accurate against the new text.
-      const isApplying = applyingPolish.has(target.el)
+      const isApplying =
+        applyingPolish.has(target.el) ||
+        isExpectedPolishApplication(target.el, text)
 
       dismissSuggestionPopup()
       clearUnderlines(target)
@@ -295,7 +344,6 @@ function init(): () => void {
       // anchored to text that no longer exists.
       inflight.get(target.el)?.abort()
 
-      const text = readText(target)
       lastSeenText.set(target.el, text)
 
       // Fast-path for an emptied / whitespace-only field: cancel pending
@@ -364,6 +412,9 @@ function init(): () => void {
       if (!target) return
       focusedTarget = target
       attachMutationObserver(target)
+      if (!lastPolishedText.has(target.el)) {
+        rememberSettledPolishText(target.el, readText(target))
+      }
       if (englishTargets.has(target.el)) {
         attachPetTo(target.el)
         setPetCount(lastCount.get(target.el) ?? 0)
@@ -539,13 +590,13 @@ async function runPolish(
   if (text.length < MIN_POLISH_LENGTH) return
 
   if (!fromShortcut) {
+    if (hasSettledPolishText(target.el, text)) return
+
     const last = lastPolishedText.get(target.el)
-    if (last !== undefined) {
-      const newLen = text.length
-      const oldLen = last.length
-      const delta = Math.abs(newLen - oldLen) / Math.max(newLen, oldLen, 1)
-      if (delta <= POLISH_CHANGE_THRESHOLD) return
-    }
+    if (
+      last !== undefined &&
+      !isMeaningfulPolishChange(last, text, POLISH_CHANGE_THRESHOLD)
+    ) return
   }
 
   polishInflight.get(target.el)?.abort()
@@ -567,7 +618,7 @@ async function runPolish(
     return
   }
 
-  lastPolishedText.set(target.el, text)
+  rememberSettledPolishText(target.el, text)
   if (result.changes.length === 0) return
 
   renderPolishUnderlines(target, result.changes)
