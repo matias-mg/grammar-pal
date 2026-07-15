@@ -51,7 +51,7 @@ export async function ensureBaseSession(): Promise<LanguageModelSession> {
     initialPrompts: [{ role: "system", content: SYSTEM_PROMPT }],
     expectedInputs: [{ type: "text", languages: ["en"] }],
     expectedOutputs: [{ type: "text", languages: ["en"] }],
-    temperature: 0.2,
+    temperature: 0,
     topK: 3
   })
   try {

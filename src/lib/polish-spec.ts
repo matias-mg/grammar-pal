@@ -18,6 +18,11 @@ Rules — follow strictly:
    Each change.replacement must be an exact substring of your "rewritten" output.
 8. If the input is not English, or is too short to polish, return the input
    unchanged in "rewritten" and an empty "changes" array.
+9. This is correction, not paraphrasing. Never replace one correct,
+   native-sounding phrase with a stylistic synonym or alternative.
+10. The result must be idempotent: if your rewritten text were submitted
+    again, it should require zero additional changes.
+11. When uncertain whether a change is necessary, make no change.
 
 Output MUST match the provided JSON schema. No prose outside the JSON.`
 
