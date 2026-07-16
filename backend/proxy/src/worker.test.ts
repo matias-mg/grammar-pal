@@ -2,33 +2,32 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import worker, { type Env } from "./worker"
 
+const aiRunMock = vi.fn()
+
 function makeEnv(overrides: Partial<Env> = {}): Env {
   return {
-    GEMINI_API_KEY: "test-key",
+    AI: { run: aiRunMock } as unknown as Env["AI"],
     RATE_LIMITER: { limit: async () => ({ success: true }) },
     ...overrides
-  } as Env
+  }
 }
 
-function geminiResponse(payload: unknown): Response {
-  return new Response(
-    JSON.stringify({
-      candidates: [{ content: { parts: [{ text: JSON.stringify(payload) }] } }]
-    }),
-    { status: 200, headers: { "Content-Type": "application/json" } }
-  )
+function workersAiResponse(payload: unknown): unknown {
+  return {
+    choices: [{ message: { content: JSON.stringify(payload) } }]
+  }
 }
 
 const ORIGIN = "chrome-extension://abc123"
 
 describe("polish worker", () => {
-  const fetchMock = vi.fn()
   beforeEach(() => {
-    fetchMock.mockReset()
-    vi.stubGlobal("fetch", fetchMock)
+    aiRunMock.mockReset()
+    vi.spyOn(console, "warn").mockImplementation(() => undefined)
   })
+
   afterEach(() => {
-    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
   })
 
   it("405s on GET", async () => {
@@ -75,6 +74,7 @@ describe("polish worker", () => {
   })
 
   it("returns 200 with rewritten + changes on happy path", async () => {
+    const input = "I am living some changes in my life."
     const payload = {
       rewritten: "I am experiencing some changes in my life.",
       changes: [
@@ -85,20 +85,58 @@ describe("polish worker", () => {
         }
       ]
     }
-    fetchMock.mockResolvedValueOnce(geminiResponse(payload))
+    aiRunMock.mockResolvedValueOnce(workersAiResponse(payload))
+    const req = new Request("https://proxy.test/polish", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: ORIGIN },
+      body: JSON.stringify({ text: input })
+    })
+    const res = await worker.fetch(req, makeEnv())
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toEqual(payload)
+    expect(aiRunMock).toHaveBeenCalledOnce()
+    expect(aiRunMock).toHaveBeenCalledWith(
+      "@cf/google/gemma-4-26b-a4b-it",
+      expect.objectContaining({
+        messages: [
+          expect.objectContaining({ role: "system" }),
+          { role: "user", content: input }
+        ],
+        temperature: 0,
+        max_completion_tokens: 2048,
+        chat_template_kwargs: { enable_thinking: false },
+        response_format: expect.objectContaining({
+          type: "json_schema",
+          json_schema: expect.objectContaining({
+            name: "polish_result",
+            strict: true
+          })
+        })
+      })
+    )
+  })
+
+  it("502s when Workers AI rejects", async () => {
+    aiRunMock.mockRejectedValueOnce(new Error("Workers AI unavailable"))
     const req = new Request("https://proxy.test/polish", {
       method: "POST",
       headers: { "Content-Type": "application/json", Origin: ORIGIN },
       body: JSON.stringify({ text: "I am living some changes in my life." })
     })
     const res = await worker.fetch(req, makeEnv())
-    expect(res.status).toBe(200)
-    const body = await res.json()
-    expect(body).toEqual(payload)
+    expect(res.status).toBe(502)
   })
 
-  it("502s when Gemini returns non-OK", async () => {
-    fetchMock.mockResolvedValueOnce(new Response("nope", { status: 500 }))
+  it.each([
+    ["empty output", { choices: [{ message: { content: null } }] }],
+    ["malformed JSON", { choices: [{ message: { content: "not json" } }] }],
+    [
+      "invalid result shape",
+      workersAiResponse({ rewritten: "Rewritten text", changes: "invalid" })
+    ]
+  ])("502s on %s from Workers AI", async (_name, output) => {
+    aiRunMock.mockResolvedValueOnce(output)
     const req = new Request("https://proxy.test/polish", {
       method: "POST",
       headers: { "Content-Type": "application/json", Origin: ORIGIN },
