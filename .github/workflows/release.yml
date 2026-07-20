@@ -1,0 +1,52 @@
+name: Release extension
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      PLASMO_PUBLIC_POLISH_URL: ${{ vars.PLASMO_PUBLIC_POLISH_URL }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Install Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Check cloud fallback URL
+        run: test -n "$PLASMO_PUBLIC_POLISH_URL"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Package extension
+        run: pnpm package
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME"
+          build/chrome-mv3-prod.zip
+          --verify-tag
+          --generate-notes
+          --title "Grammar Pal $GITHUB_REF_NAME"
