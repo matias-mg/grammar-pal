@@ -25,3 +25,4 @@ simple = { limit = 5, period = 60 }
 
 [ai]
 binding = "AI"
+remote = true

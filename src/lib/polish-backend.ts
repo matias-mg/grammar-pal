@@ -1,13 +1,13 @@
 // Resolves which polish backend to use this browser session — the Chromium
 // built-in Prompt API (on-device, fast) when available, otherwise the
-// Cloudflare-Worker-fronted Gemini path. Cached in chrome.storage.session so
+// Cloudflare Workers AI path. Cached in chrome.storage.session so
 // the resolution survives service-worker restarts but is re-evaluated on a
 // new browser session, per the product brief.
 
 import { SYSTEM_PROMPT } from "./polish-spec"
 import { resetPromptApiSession } from "./polish-prompt-api"
 
-export type PolishBackend = "prompt-api" | "gemini" | "downloadable"
+export type PolishBackend = "prompt-api" | "workers-ai" | "downloadable"
 
 const CACHE_KEY = "polish_backend_session"
 
@@ -22,7 +22,11 @@ async function readCache(): Promise<PolishBackend | null> {
   try {
     const raw = await chrome.storage.session.get(CACHE_KEY)
     const value = raw[CACHE_KEY]
-    if (value === "prompt-api" || value === "gemini" || value === "downloadable") {
+    if (
+      value === "prompt-api" ||
+      value === "workers-ai" ||
+      value === "downloadable"
+    ) {
       return value
     }
     return null
@@ -41,18 +45,20 @@ async function writeCache(value: PolishBackend): Promise<void> {
 
 async function detect(): Promise<PolishBackend> {
   if (typeof LanguageModel === "undefined") {
-    console.info("[grammar-pal] LanguageModel global not exposed — using Gemini")
-    return "gemini"
+    console.info(
+      "[grammar-pal] LanguageModel global not exposed — using Cloudflare Workers AI"
+    )
+    return "workers-ai"
   }
   try {
     const a = await LanguageModel.availability(PROMPT_API_OPTIONS)
     console.info(`[grammar-pal] LanguageModel.availability() → ${a}`)
     if (a === "available") return "prompt-api"
     if (a === "downloadable" || a === "downloading") return "downloadable"
-    return "gemini"
+    return "workers-ai"
   } catch (err) {
     console.warn("[grammar-pal] LanguageModel.availability() threw", err)
-    return "gemini"
+    return "workers-ai"
   }
 }
 

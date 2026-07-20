@@ -3,13 +3,14 @@
 //   • Harper (local, always-on): runs on a 400 ms debounce, key="default".
 //     See src/background.ts. Produces underlines.
 //
-//   • Polish via Gemini (network, opt-in): runs on a 3500 ms debounce
-//     (key="polish") AND on the "##" shortcut. See src/lib/engine-polish.ts.
-//     Produces animated Gemini-gradient underlines (polish-underlines.ts);
+//   • AI polish (opt-in): uses the browser Prompt API locally when available,
+//     otherwise Cloudflare Workers AI after a 3500 ms debounce (key="polish").
+//     The "##" shortcut runs either backend immediately. See engine-polish.ts.
+//     Produces animated AI underlines (polish-underlines.ts);
 //     clicking one opens a per-chunk Accept/Skip popover.
 //
 // These engines must remain fully separate — never route grammar through
-// Gemini, or polish through Harper. See CLAUDE.md "Dual-engine architecture".
+// a polish backend, or polish through Harper. See AGENTS.md "Dual-engine architecture".
 
 import type { PlasmoCSConfig } from "plasmo"
 
@@ -85,7 +86,7 @@ const DEBOUNCE_MS = 400
 const MIN_TEXT_LENGTH = 5
 const RECHECK_DELAY_MS = 50
 
-const POLISH_DEBOUNCE_GEMINI_MS = 3500
+const POLISH_DEBOUNCE_WORKERS_AI_MS = 3500
 const POLISH_DEBOUNCE_PROMPT_API_MS = 1500
 const MIN_POLISH_LENGTH = 10
 const POLISH_CHANGE_THRESHOLD = 0.03
@@ -94,8 +95,8 @@ const POLISH_FOCUSOUT_GRACE_MS = 500
 const CONTENT_INSTANCE_KEY = "__grammarPalContentInstance"
 
 let settings: Settings = DEFAULT_SETTINGS
-let polishBackend: PolishBackendKind = "gemini"
-let polishDebounceMs = POLISH_DEBOUNCE_GEMINI_MS
+let polishBackend: PolishBackendKind = "workers-ai"
+let polishDebounceMs = POLISH_DEBOUNCE_WORKERS_AI_MS
 let modalShownThisSession = false
 const inflight = new WeakMap<Element, AbortController>()
 const knownTargets = new Set<EditableTarget>()
@@ -224,7 +225,7 @@ function init(): () => void {
     polishDebounceMs =
       backend === "prompt-api"
         ? POLISH_DEBOUNCE_PROMPT_API_MS
-        : POLISH_DEBOUNCE_GEMINI_MS
+        : POLISH_DEBOUNCE_WORKERS_AI_MS
   })
   const unsubscribeSettings = onSettingsChange((s) => {
     if (listenerAbort.signal.aborted) return
@@ -384,13 +385,13 @@ function init(): () => void {
         // Cancel AFTER stripTrailingMarker: the synthetic input event it
         // dispatches re-enters this listener and (because the text no longer
         // ends with the trigger) schedules a fresh polish debounce, which
-        // would fire a second Gemini call 3.5 s later against the same text.
+        // would fire a second Workers AI call 3.5 s later against the same text.
         cancelDebounceForElement(target.el, "polish")
         void runPolish(target, stripped, true)
         return
       }
 
-      // Path A — debounced polish (1.5 s for Prompt API / 3.5 s for Gemini),
+      // Path A — debounced polish (1.5 s for Prompt API / 3.5 s for Workers AI),
       // subject to 3 % gate inside runPolish.
       debounceForElement(
         target.el,

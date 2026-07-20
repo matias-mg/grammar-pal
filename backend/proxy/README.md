@@ -1,21 +1,21 @@
-# grammar-pal-polish (Cloudflare Worker proxy)
+# Grammar Pal polish Worker
 
-This Worker holds the Gemini API key and proxies polish-to-native requests
-from the Grammar Pal extension. It is the network half of Grammar Pal's
-dual-engine architecture — see the root `CLAUDE.md` for the rules that keep
-this engine separate from Harper.
+This Cloudflare Worker is the cloud fallback for Grammar Pal's optional AI polish. The extension calls `POST /polish`, and the Worker runs Gemma 4 26B A4B through the Cloudflare Workers AI `AI` binding.
 
-## Local dev
+No model-provider API key is used. The model ID in `src/worker.ts` starts with `@cf/google/` because that is its required Cloudflare Workers AI catalog ID.
 
-```sh
+## Local development
+
+```bash
 pnpm install
-echo "GEMINI_API_KEY=sk-..." > .dev.vars   # gitignored
-pnpm dev                                    # wrangler dev on :8787
+pnpm dev
 ```
 
-Smoke test against the local dev server:
+Wrangler may ask you to sign in to Cloudflare. The `AI` binding uses a remote Workers AI resource during development, so local requests can count toward Workers AI usage.
 
-```sh
+Smoke test the local endpoint:
+
+```bash
 curl -X POST http://localhost:8787/polish \
   -H "Content-Type: application/json" \
   -d '{"text":"I am living some changes in my life."}'
@@ -23,40 +23,51 @@ curl -X POST http://localhost:8787/polish \
 
 ## Deploy
 
-```sh
-wrangler secret put GEMINI_API_KEY        # one-time, sets prod secret
-pnpm deploy                                # publishes to *.workers.dev
+```bash
+pnpm deploy
 ```
 
-Record the resulting `*.workers.dev` URL and put `<that-url>/polish` into
-the extension's root `.env` as `PLASMO_PUBLIC_POLISH_URL`.
+Add the deployed URL to the extension's root `.env` file:
 
-## Tests
+```dotenv
+PLASMO_PUBLIC_POLISH_URL=https://grammar-pal-polish.<your-subdomain>.workers.dev/polish
+```
 
-```sh
+The Worker needs the `AI` and `RATE_LIMITER` bindings declared in `wrangler.toml`. It does not need a model-provider secret.
+
+## Test
+
+```bash
 pnpm test
 ```
 
-Covers: 405 on GET, 400 on bad body, 429 on rate limit, 502 on Gemini
-error, 200 happy path with stubbed Gemini, OPTIONS preflight.
+The suite covers method and body validation, rate limiting, Workers AI failures and invalid output, a successful structured result, and CORS preflight.
 
 ## Endpoint
 
 `POST /polish`
 
-Request body:
+Request:
+
 ```json
-{ "text": "..." }   // ≤ 8000 chars
+{ "text": "..." }
 ```
 
-Response body (200):
+Text must contain 1 to 8,000 characters.
+
+Successful response:
+
 ```json
 {
   "rewritten": "...",
   "changes": [
-    { "original": "...", "replacement": "...", "reason": "..." }
+    {
+      "original": "...",
+      "replacement": "...",
+      "reason": "..."
+    }
   ]
 }
 ```
 
-Per-IP rate limit: 5 req/min via Cloudflare's `RATE_LIMITER` binding.
+The endpoint accepts Chrome extension origins, validates the Workers AI result before returning it, and limits each IP to five requests per minute.

@@ -1,63 +1,83 @@
 # Project: Grammar Pet Extension
 
-## What we're building
-A Chrome browser extension (Manifest V3) that:
-- Detects when the user types in any input, textarea, or contenteditable element
-- Runs **Harper** (Automattic's on-device WASM grammar checker) in the MV3
-  service worker on a 400 ms debounce and renders coloured underlines:
-  - Red for grammar/spelling errors
-  - Yellow for style/punctuation suggestions
-  - Blue for everything else
-- Pop-up shows replacement suggestions on click
-- Floating SVG pet in the corner with 5 expressions tied to error count
-  (happy, neutral, curious, concerned, alarmed)
-- Mode toggle (Formal/Chill) that adjusts which categories are reported
-- **Polish to native English (opt-in, Phase 2)** — runs on a 3500 ms debounce
-  or `##` shortcut, sends text to a Cloudflare Worker proxy that calls
-  Gemma 4 26B, renders a Shadow-DOM panel with per-change
-  Accept / Skip / Accept all / Dismiss controls.
+## What we are building
 
-## Stack (locked in — do not deviate)
-- Plasmo framework (https://www.plasmo.com)
-- TypeScript
-- chrome.storage.local for settings
+Grammar Pal is a Chrome Manifest V3 extension that:
+
+- Detects typing in inputs, textareas, and contenteditable elements.
+- Runs Harper locally in the MV3 service worker on a 400 ms debounce.
+- Renders red grammar/spelling, yellow style/punctuation, and blue other underlines.
+- Shows replacement suggestions when an underline is clicked.
+- Shows one floating SVG pet with five expressions tied to the issue count.
+- Offers Formal and Chill grammar modes.
+- Offers opt-in AI polish through the browser Prompt API first, with Cloudflare Workers AI running Gemma 4 26B A4B as the fallback.
+- Runs local AI polish on a 1500 ms debounce and cloud polish on a 3500 ms debounce. The `##` shortcut runs the selected polish backend immediately.
+
+## Locked stack
+
+- Plasmo framework
+- TypeScript strict mode
+- React 18 for the popup
+- `chrome.storage.local` for settings and `chrome.storage.session` for the session-level polish backend choice
 - Harper (`harper.js`) running locally in the MV3 service worker
-- Cloudflare Worker proxy (Wrangler, TypeScript) holds the Gemini API key.
-  Repo path: `backend/proxy/`.
+- Chromium Prompt API (`LanguageModel`) for local polish
+- Cloudflare Worker in `backend/proxy/`, written in TypeScript and managed with Wrangler
+- Cloudflare Workers AI `AI` binding using model ID `@cf/google/gemma-4-26b-a4b-it`
+- Vitest for extension and Worker unit tests
 
-## Dual-engine architecture (do not conflate)
+The `@cf/google/...` value is Cloudflare's required model catalog ID. It does not mean the project calls a model provider directly. Do not replace the catalog ID unless the Workers AI model changes.
 
-Grammar Pal runs two engines simultaneously. They are wired into the same
-content-script input listener for event-efficiency but are otherwise fully
-independent. Never route work across the boundary.
+## Engine architecture: do not mix the boundaries
 
-- **Harper** (local WASM, always-on). Lives in `src/background.ts`. Fires on
-  the 400 ms debounce (key `"default"`). Produces grammar/spelling
-  underlines. No network, no opt-in.
-- **Gemini polish** (network, opt-in). Lives in `src/lib/engine-polish.ts`
-  + Cloudflare Worker at `backend/proxy/`. Fires on the 3500 ms debounce
-  (key `"polish"`) OR the `##` shortcut. Produces the polish panel with
-  per-change Accept/Skip controls. Default off.
+Grammar Pal has two product engines. They share one content-script input listener for efficiency but are otherwise independent.
+
+### Harper grammar engine
+
+- Lives mainly in `src/background.ts`.
+- Runs locally and is always on when Grammar Pal is enabled.
+- Uses the 400 ms debounce key `default`.
+- Produces grammar, spelling, style, and punctuation underlines.
+- Does not use AI polish or the network.
+
+### AI polish engine
+
+- Lives in `src/lib/engine-polish.ts`, `src/lib/polish-backend.ts`, `src/lib/polish-prompt-api.ts`, and `backend/proxy/`.
+- Is opt-in and off by default.
+- Uses the debounce key `polish` or the `##` shortcut.
+- Tries the browser Prompt API first. If local AI is unavailable or not ready, it uses the Cloudflare Worker and Workers AI.
+- Produces AI polish underlines and per-change Accept/Skip controls.
 
 Hard rules:
-1. Harper is never used for polish suggestions.
-2. Gemini is never used for grammar underlining.
-3. The two engines have independent debounce keys, AbortController maps,
-   inflight state, and UI overlays.
-4. Deleting one engine must not break the other.
 
-## Out of scope (still)
-- User accounts, Stripe, billing
-- Firefox/Safari ports
-- Pet customization/multiple pets (single pet, 5 expressions only)
+1. Harper is never used for polish suggestions.
+2. The browser Prompt API and Workers AI are never used for grammar underlining.
+3. Grammar and polish keep separate debounce keys, AbortController maps, in-flight state, and overlay state.
+4. The two polish backends must return the same `PolishResult` shape. Keep `src/lib/polish-spec.ts` and `backend/proxy/src/prompt.ts` in sync.
+5. Never add a direct model-provider API key to the extension. Workers AI access must stay behind the Cloudflare `AI` binding.
+6. Removing or changing one engine must not break the other.
+
+## Documentation sync rule
+
+If asked to replace a technology, AI model, AI provider, framework, or service, update every affected Markdown file in the same change. At minimum, check `README.md`, `AGENTS.md`, and Markdown files inside the changed package. Search the full repository for old names and remove stale setup, privacy, architecture, and credential instructions. Keep required external identifiers only when the active platform needs them, and explain why they remain.
+
+## Out of scope
+
+- User accounts, billing, and Stripe
+- Firefox or Safari ports
+- Pet customization or multiple pets
 - Google Docs and other canvas-based editors
 
 ## Conventions
-- Use TypeScript strict mode
-- Render the pet and overlays in a Shadow DOM to avoid host page CSS bleed
-- Never modify the host page's DOM outside the Shadow DOM root
-- All user-visible strings in a single i18n file even though we only ship English
 
-## Testing target
-Must work on: Twitter/X, LinkedIn, Reddit, Gmail compose textarea, generic blog comments
-Explicitly not required to work on: Google Docs, Notion, Slack desktop
+- Keep TypeScript in strict mode.
+- Render extension UI in a Shadow DOM to prevent host-page CSS bleed.
+- Do not inject Grammar Pal UI outside the Shadow DOM root. Text changes requested by the user may still update the active editable field.
+- Keep all user-visible strings in `src/lib/i18n.ts`.
+- Preserve the local-first order: Prompt API before Workers AI.
+- Keep AI polish off by default.
+
+## Testing targets
+
+Must work on X, LinkedIn, Reddit, Gmail compose, and normal blog comment fields.
+
+Google Docs, Notion, Slack desktop, and other canvas or custom editors are not required.

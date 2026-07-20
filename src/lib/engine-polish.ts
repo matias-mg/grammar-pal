@@ -1,12 +1,12 @@
 // Polish engine — opt-in, fires on 1.5 s debounce (Prompt API) or 3.5 s
-// debounce (Gemini fallback) OR ## shortcut. The service worker
+// debounce (Cloudflare Workers AI fallback) OR ## shortcut. The service worker
 // (src/background.ts) picks the backend at session start via
 // resolvePolishBackend(); this module just forwards requests over the
 // chrome.runtime bus and stays backend-agnostic.
 
 import type { PolishResult } from "../types/polish"
 
-export type PolishBackendKind = "prompt-api" | "gemini" | "downloadable"
+export type PolishBackendKind = "prompt-api" | "workers-ai" | "downloadable"
 
 export type PolishRequest = {
   type: "polish"
@@ -68,7 +68,7 @@ export async function getPolishBackend(): Promise<PolishBackendKind> {
       request,
       (response: PolishBackendResponse | undefined) => {
         if (chrome.runtime.lastError || !response) {
-          resolve("gemini")
+          resolve("workers-ai")
           return
         }
         resolve(response.backend)

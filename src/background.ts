@@ -1,7 +1,7 @@
 // This service worker hosts the HARPER engine (local WASM, always-on grammar
 // underlining). It also forwards POLISH requests to the Cloudflare Worker
-// proxy. The two engines are independent — never route Harper through Gemini,
-// or polish through Harper. See CLAUDE.md "Dual-engine architecture".
+// endpoint. The two engines are independent — never route Harper through the
+// polish backends, or polish through Harper. See AGENTS.md "Dual-engine architecture".
 //
 // Parcel (Plasmo's bundler) doesn't resolve the harper.js package.json
 // "exports" map cleanly — neither the bare specifier nor subpath like
@@ -204,7 +204,7 @@ chrome.runtime.onMessage.addListener(
           sendResponse({ backend } satisfies PolishBackendResponse),
         (err) => {
           console.warn("[grammar-pal] backend resolve failed", err)
-          sendResponse({ backend: "gemini" } satisfies PolishBackendResponse)
+          sendResponse({ backend: "workers-ai" } satisfies PolishBackendResponse)
         }
       )
       return true

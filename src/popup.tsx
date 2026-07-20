@@ -13,7 +13,7 @@ const isEdge =
 
 function IndexPopup() {
   const [settings, setLocal] = useState<Settings | null>(null)
-  const [backend, setBackend] = useState<PolishBackendKind>("gemini")
+  const [backend, setBackend] = useState<PolishBackendKind>("workers-ai")
 
   useEffect(() => {
     void getSettings().then(setLocal)
@@ -157,7 +157,12 @@ function IndexPopup() {
               <p className="gp-cloud-card__body">{strings.polishCloudBody}</p>
               <p className="gp-privacy">
                 {strings.polishPrivacyPrefix}
-                <a href="#">{strings.polishPrivacyLink}</a>
+                <a
+                  href={strings.polishPrivacyUrl}
+                  target="_blank"
+                  rel="noopener noreferrer">
+                  {strings.polishPrivacyLink}
+                </a>
                 {strings.polishPrivacySuffix}
               </p>
               {isEdge && (

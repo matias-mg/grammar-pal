@@ -25,12 +25,13 @@ export const strings = {
   petTooltipAlarmed: "Lots of issues — take a look.",
 
   polishLabel: "Polish to native (uses AI, opt-in)",
-  polishCloudBadge: "Cloud AI active",
-  polishCloudTitle: "Works fine, but local AI is better",
+  polishCloudBadge: "Cloudflare AI fallback",
+  polishCloudTitle: "Cloud polish is active",
   polishCloudBody:
-    "Polish suggestions are currently processed by Google's AI. This is okay to use, but local AI is faster and keeps your text on this device.",
-  polishPrivacyPrefix: "See Google's ",
+    "Your browser's local AI is not ready, so polish suggestions use Gemma 4 on Cloudflare Workers AI. Local AI is usually faster and keeps your text on this device.",
+  polishPrivacyPrefix: "See Cloudflare's ",
   polishPrivacyLink: "privacy policy",
+  polishPrivacyUrl: "https://www.cloudflare.com/privacypolicy/",
   polishPrivacySuffix: ".",
   polishTitle: "Polish to native English",
   polishAccept: "Accept",

@@ -1,6 +1,6 @@
 // Keep in sync with backend/proxy/src/prompt.ts. The Cloudflare Worker can't
 // import across the extension boundary, so the two definitions are duplicated
-// intentionally. Both the Gemini path (worker) and the Prompt API path
+// intentionally. Both the Workers AI path and the Prompt API path
 // (src/lib/polish-prompt-api.ts) feed the same SYSTEM_PROMPT and
 // RESPONSE_SCHEMA to their respective backends so output shape is identical.
 
