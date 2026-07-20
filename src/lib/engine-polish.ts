@@ -1,9 +1,12 @@
-// Polish engine — opt-in, network-backed, fires on 3.5 s debounce OR ## shortcut.
-// This is the Gemini half of Grammar Pal's two-engine model. The Harper half
-// lives in src/background.ts and src/lib/engine.ts. The two engines never share
-// state or routing — see CLAUDE.md "Dual-engine architecture".
+// Polish engine — opt-in, fires on 1.5 s debounce (Prompt API) or 3.5 s
+// debounce (Cloudflare Workers AI fallback) OR ## shortcut. The service worker
+// (src/background.ts) picks the backend at session start via
+// resolvePolishBackend(); this module just forwards requests over the
+// chrome.runtime bus and stays backend-agnostic.
 
 import type { PolishResult } from "../types/polish"
+
+export type PolishBackendKind = "prompt-api" | "workers-ai" | "downloadable"
 
 export type PolishRequest = {
   type: "polish"
@@ -11,6 +14,22 @@ export type PolishRequest = {
 }
 
 export type PolishResponse = PolishResult | null
+
+export type PolishBackendRequest = {
+  type: "get-polish-backend"
+}
+
+export type PolishBackendResponse = {
+  backend: PolishBackendKind
+}
+
+export type TriggerLocalAiDownloadRequest = {
+  type: "trigger-local-ai-download"
+}
+
+export type TriggerLocalAiDownloadResponse = {
+  ok: boolean
+}
 
 export async function polish(
   text: string,
@@ -39,5 +58,39 @@ export async function polish(
       }
       finish(response)
     })
+  })
+}
+
+export async function getPolishBackend(): Promise<PolishBackendKind> {
+  const request: PolishBackendRequest = { type: "get-polish-backend" }
+  return await new Promise<PolishBackendKind>((resolve) => {
+    chrome.runtime.sendMessage(
+      request,
+      (response: PolishBackendResponse | undefined) => {
+        if (chrome.runtime.lastError || !response) {
+          resolve("workers-ai")
+          return
+        }
+        resolve(response.backend)
+      }
+    )
+  })
+}
+
+export async function triggerLocalAiDownload(): Promise<boolean> {
+  const request: TriggerLocalAiDownloadRequest = {
+    type: "trigger-local-ai-download"
+  }
+  return await new Promise<boolean>((resolve) => {
+    chrome.runtime.sendMessage(
+      request,
+      (response: TriggerLocalAiDownloadResponse | undefined) => {
+        if (chrome.runtime.lastError || !response) {
+          resolve(false)
+          return
+        }
+        resolve(response.ok)
+      }
+    )
   })
 }

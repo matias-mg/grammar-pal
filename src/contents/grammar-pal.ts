@@ -3,13 +3,14 @@
 //   • Harper (local, always-on): runs on a 400 ms debounce, key="default".
 //     See src/background.ts. Produces underlines.
 //
-//   • Polish via Gemini (network, opt-in): runs on a 3500 ms debounce
-//     (key="polish") AND on the "##" shortcut. See src/lib/engine-polish.ts.
-//     Produces animated Gemini-gradient underlines (polish-underlines.ts);
+//   • AI polish (opt-in): uses the browser Prompt API locally when available,
+//     otherwise Cloudflare Workers AI after a 3500 ms debounce (key="polish").
+//     The "##" shortcut runs either backend immediately. See engine-polish.ts.
+//     Produces animated AI underlines (polish-underlines.ts);
 //     clicking one opens a per-chunk Accept/Skip popover.
 //
 // These engines must remain fully separate — never route grammar through
-// Gemini, or polish through Harper. See CLAUDE.md "Dual-engine architecture".
+// a polish backend, or polish through Harper. See AGENTS.md "Dual-engine architecture".
 
 import type { PlasmoCSConfig } from "plasmo"
 
@@ -21,10 +22,24 @@ import {
   type EditableTarget
 } from "../lib/editable"
 import { check } from "../lib/engine"
-import { polish } from "../lib/engine-polish"
-import { getSettings, onSettingsChange } from "../lib/storage"
+import {
+  getPolishBackend,
+  polish,
+  triggerLocalAiDownload,
+  type PolishBackendKind
+} from "../lib/engine-polish"
+import {
+  isMeaningfulPolishChange,
+  rememberPolishText
+} from "../lib/polish-state"
+import { getSettings, onSettingsChange, setSettings } from "../lib/storage"
 import { DEFAULT_SETTINGS, type Settings } from "../lib/types"
 import { applyReplacement } from "../overlay/apply-replacement"
+import {
+  dismissLocalAiModal,
+  isLocalAiModalOpen,
+  showLocalAiModal
+} from "../overlay/local-ai-modal"
 import {
   dismissPolishPopover,
   showPolishPopover
@@ -71,7 +86,8 @@ const DEBOUNCE_MS = 400
 const MIN_TEXT_LENGTH = 5
 const RECHECK_DELAY_MS = 50
 
-const POLISH_DEBOUNCE_MS = 3500
+const POLISH_DEBOUNCE_WORKERS_AI_MS = 3500
+const POLISH_DEBOUNCE_PROMPT_API_MS = 1500
 const MIN_POLISH_LENGTH = 10
 const POLISH_CHANGE_THRESHOLD = 0.03
 const POLISH_TRIGGER = "##"
@@ -79,6 +95,9 @@ const POLISH_FOCUSOUT_GRACE_MS = 500
 const CONTENT_INSTANCE_KEY = "__grammarPalContentInstance"
 
 let settings: Settings = DEFAULT_SETTINGS
+let polishBackend: PolishBackendKind = "workers-ai"
+let polishDebounceMs = POLISH_DEBOUNCE_WORKERS_AI_MS
+let modalShownThisSession = false
 const inflight = new WeakMap<Element, AbortController>()
 const knownTargets = new Set<EditableTarget>()
 const lastCount = new WeakMap<Element, number>()
@@ -87,6 +106,11 @@ let focusedTarget: EditableTarget | null = null
 
 const polishInflight = new WeakMap<Element, AbortController>()
 const lastPolishedText = new WeakMap<Element, string>()
+const polishTextHistory = new WeakMap<Element, Set<string>>()
+// Host editors may echo an accepted replacement through a later input or DOM
+// mutation. Matching the resulting text is durable; a microtask-only flag is
+// not, especially in React and ProseMirror editors.
+const expectedAppliedPolishText = new WeakMap<Element, string>()
 const lastSeenText = new WeakMap<Element, string>()
 // Suppresses the input-listener clear for the synthetic input event fired by
 // applyReplacement when we accept a polish change — otherwise the act of
@@ -100,6 +124,28 @@ const applyingPolish = new WeakSet<Element>()
 // DOM mutation directly and runs the same cleanup path.
 const domObservers = new WeakMap<Element, MutationObserver>()
 let lastPolishInteractionAt = 0
+
+function rememberSettledPolishText(el: Element, text: string): void {
+  let history = polishTextHistory.get(el)
+  if (!history) {
+    history = new Set<string>()
+    polishTextHistory.set(el, history)
+  }
+  rememberPolishText(history, text)
+  lastPolishedText.set(el, text)
+}
+
+function hasSettledPolishText(el: Element, text: string): boolean {
+  return polishTextHistory.get(el)?.has(text) ?? false
+}
+
+function isExpectedPolishApplication(el: Element, text: string): boolean {
+  const expected = expectedAppliedPolishText.get(el)
+  if (expected === undefined) return false
+  if (expected === text) return true
+  if (!applyingPolish.has(el)) expectedAppliedPolishText.delete(el)
+  return false
+}
 
 type ContentInstance = {
   cleanup: () => void
@@ -132,7 +178,9 @@ function handleEditableMutation(target: EditableTarget): void {
   if (lastSeenText.get(target.el) === text) return
   lastSeenText.set(target.el, text)
 
-  const isApplying = applyingPolish.has(target.el)
+  const isApplying =
+    applyingPolish.has(target.el) ||
+    isExpectedPolishApplication(target.el, text)
 
   dismissSuggestionPopup()
   clearUnderlines(target)
@@ -171,6 +219,14 @@ function init(): () => void {
     setPetMode(s.mode)
     applyEnabledState()
   })
+  void getPolishBackend().then((backend) => {
+    if (listenerAbort.signal.aborted) return
+    polishBackend = backend
+    polishDebounceMs =
+      backend === "prompt-api"
+        ? POLISH_DEBOUNCE_PROMPT_API_MS
+        : POLISH_DEBOUNCE_WORKERS_AI_MS
+  })
   const unsubscribeSettings = onSettingsChange((s) => {
     if (listenerAbort.signal.aborted) return
     const prev = settings
@@ -178,7 +234,10 @@ function init(): () => void {
     setPetMode(s.mode)
     applyEnabledState()
     if (s.enabled && s.mode !== prev.mode) recheckAll()
-    if (!s.polishEnabled) clearAllPolish()
+    if (!s.polishEnabled) {
+      clearAllPolish()
+      dismissLocalAiModal()
+    }
   })
 
   setPolishUnderlineInteractionStartHandler(() => {
@@ -217,6 +276,13 @@ function init(): () => void {
             removePolishAnchor(target, anchor)
             return
           }
+          const nextText =
+            current.slice(0, anchor.offset) +
+            anchor.change.replacement +
+            current.slice(anchor.offset + anchor.length)
+          expectedAppliedPolishText.set(target.el, nextText)
+          cancelDebounceForElement(target.el, "polish")
+          polishInflight.get(target.el)?.abort()
           applyingPolish.add(target.el)
           try {
             applyReplacement(
@@ -225,6 +291,12 @@ function init(): () => void {
               anchor.offset + anchor.length,
               anchor.change.replacement
             )
+            const appliedText = readText(target)
+            if (appliedText === nextText) {
+              rememberSettledPolishText(target.el, appliedText)
+            } else {
+              expectedAppliedPolishText.delete(target.el)
+            }
           } finally {
             queueMicrotask(() => applyingPolish.delete(target.el))
           }
@@ -248,12 +320,15 @@ function init(): () => void {
       if (!settings.enabled) return
       const target = classifyEditable(event.target)
       if (!target) return
+      const text = readText(target)
 
       // Synthetic input event from applyReplacement when accepting a polish
       // chunk — preserve remaining polish underlines and don't kick the
       // polish debounce. Harper still clears and re-checks normally so its
       // offsets stay accurate against the new text.
-      const isApplying = applyingPolish.has(target.el)
+      const isApplying =
+        applyingPolish.has(target.el) ||
+        isExpectedPolishApplication(target.el, text)
 
       dismissSuggestionPopup()
       clearUnderlines(target)
@@ -270,7 +345,6 @@ function init(): () => void {
       // anchored to text that no longer exists.
       inflight.get(target.el)?.abort()
 
-      const text = readText(target)
       lastSeenText.set(target.el, text)
 
       // Fast-path for an emptied / whitespace-only field: cancel pending
@@ -311,19 +385,22 @@ function init(): () => void {
         // Cancel AFTER stripTrailingMarker: the synthetic input event it
         // dispatches re-enters this listener and (because the text no longer
         // ends with the trigger) schedules a fresh polish debounce, which
-        // would fire a second Gemini call 3.5 s later against the same text.
+        // would fire a second Workers AI call 3.5 s later against the same text.
         cancelDebounceForElement(target.el, "polish")
         void runPolish(target, stripped, true)
         return
       }
 
-      // Path A — 3.5 s debounce (subject to 3 % gate inside runPolish).
+      // Path A — debounced polish (1.5 s for Prompt API / 3.5 s for Workers AI),
+      // subject to 3 % gate inside runPolish.
       debounceForElement(
         target.el,
         () => void runPolish(target, readText(target), false),
-        POLISH_DEBOUNCE_MS,
+        polishDebounceMs,
         "polish"
       )
+
+      maybeOfferLocalAiDownload()
     },
     { capture: true, signal: listenerAbort.signal }
   )
@@ -336,6 +413,9 @@ function init(): () => void {
       if (!target) return
       focusedTarget = target
       attachMutationObserver(target)
+      if (!lastPolishedText.has(target.el)) {
+        rememberSettledPolishText(target.el, readText(target))
+      }
       if (englishTargets.has(target.el)) {
         attachPetTo(target.el)
         setPetCount(lastCount.get(target.el) ?? 0)
@@ -375,6 +455,7 @@ function init(): () => void {
     setPolishUnderlineInteractionStartHandler(null)
     clearAll()
     clearAllPolish()
+    dismissLocalAiModal()
     hidePet()
     if (focusedTarget) {
       detachMutationObserver(focusedTarget.el)
@@ -409,6 +490,27 @@ function clearAllPolish() {
   }
   hideAllPolishLoading()
   dismissPolishPopover()
+}
+
+function maybeOfferLocalAiDownload(): void {
+  if (modalShownThisSession) return
+  if (!settings.polishEnabled) return
+  if (polishBackend !== "downloadable") return
+  if (settings.localAiDownloadChoice !== null) return
+  if (isLocalAiModalOpen()) return
+  modalShownThisSession = true
+  showLocalAiModal({
+    onAccept: async () => {
+      await setSettings({ localAiDownloadChoice: "accepted" })
+      // Fire-and-forget: the download can take a long time. The cached
+      // backend will flip to "prompt-api" once the worker finishes, and the
+      // 1.5 s debounce will kick in on the next browser session.
+      void triggerLocalAiDownload()
+    },
+    onReject: async () => {
+      await setSettings({ localAiDownloadChoice: "rejected" })
+    }
+  })
 }
 
 function findTrailingPolishTrigger(text: string): number {
@@ -489,13 +591,13 @@ async function runPolish(
   if (text.length < MIN_POLISH_LENGTH) return
 
   if (!fromShortcut) {
+    if (hasSettledPolishText(target.el, text)) return
+
     const last = lastPolishedText.get(target.el)
-    if (last !== undefined) {
-      const newLen = text.length
-      const oldLen = last.length
-      const delta = Math.abs(newLen - oldLen) / Math.max(newLen, oldLen, 1)
-      if (delta <= POLISH_CHANGE_THRESHOLD) return
-    }
+    if (
+      last !== undefined &&
+      !isMeaningfulPolishChange(last, text, POLISH_CHANGE_THRESHOLD)
+    ) return
   }
 
   polishInflight.get(target.el)?.abort()
@@ -517,7 +619,7 @@ async function runPolish(
     return
   }
 
-  lastPolishedText.set(target.el, text)
+  rememberSettledPolishText(target.el, text)
   if (result.changes.length === 0) return
 
   renderPolishUnderlines(target, result.changes)

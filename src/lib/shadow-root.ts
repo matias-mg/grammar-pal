@@ -227,6 +227,97 @@ const STYLES = `
   @media (prefers-reduced-motion: reduce) {
     .polish-loading { animation: none; }
   }
+
+  .local-ai-modal {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    pointer-events: auto;
+    background:
+      linear-gradient(rgba(18, 20, 27, 0.97), rgba(18, 20, 27, 0.97)) padding-box,
+      var(--gp-polish-gradient) border-box;
+    background-size: 100% 100%, 200% 100%;
+    background-position: 0 0, 200% 50%;
+    color: #ffffff;
+    border: 1.5px solid transparent;
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.32);
+    padding: 14px 16px;
+    max-width: 320px;
+    font: 13px/1.45 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    z-index: 2147483647;
+    animation: gp-polish-border-flow 6s linear infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .local-ai-modal { animation: none; }
+  }
+  .local-ai-modal__title {
+    margin: 0 0 6px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #ffffff;
+  }
+  .local-ai-modal__body {
+    margin: 0 0 10px 0;
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 12.5px;
+  }
+  .local-ai-modal__body a {
+    color: #7cc4ff;
+    text-decoration: underline;
+  }
+  .local-ai-modal__body a:hover {
+    color: #a8d8ff;
+  }
+  .local-ai-modal__note {
+    margin: 0 0 12px 0;
+    font-size: 11.5px;
+    color: #f5a524;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .local-ai-modal__note::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 0 3px rgba(245, 165, 36, 0.18);
+    flex: none;
+  }
+  .local-ai-modal__actions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+  }
+  .local-ai-modal__btn {
+    background: transparent;
+    color: rgba(255, 255, 255, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: 999px;
+    padding: 5px 14px;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .local-ai-modal__btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+  }
+  .local-ai-modal__btn--primary {
+    background: #1f6feb;
+    border-color: #1f6feb;
+    color: #ffffff;
+  }
+  .local-ai-modal__btn--primary:hover {
+    background: #1858c4;
+    border-color: #1858c4;
+  }
+  .local-ai-modal__btn[disabled] {
+    opacity: 0.6;
+    cursor: progress;
+  }
 `
 
 export function getShadowRoot(): ShadowRoot {

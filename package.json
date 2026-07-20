@@ -8,7 +8,7 @@
     "dev": "plasmo dev",
     "build": "plasmo build",
     "package": "plasmo package",
-    "test": "vitest run src/lib/languagetool.test.ts",
+    "test": "vitest run src/lib/languagetool.test.ts src/lib/polish-state.test.ts",
     "test:harper:eval": "vitest run --reporter=verbose src/lib/harper.evaluation.test.ts"
   },
   "dependencies": {
@@ -33,7 +33,7 @@
       "storage"
     ],
     "host_permissions": [
-      "https://grammar-pal-polish.*.workers.dev/*"
+      "https://*.workers.dev/*"
     ],
     "content_security_policy": {
       "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"

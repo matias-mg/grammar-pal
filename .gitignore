@@ -2,6 +2,7 @@ node_modules/
 build/
 .plasmo/
 .parcel-cache/
+.pnpm-store/
 keys/
 
 # OS / editor

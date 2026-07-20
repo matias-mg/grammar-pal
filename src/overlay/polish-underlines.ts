@@ -1,7 +1,7 @@
-// Polish underline overlay — the visual half of the Gemini engine. Mirrors
+// Polish underline overlay — the visual half of the AI polish engine. Mirrors
 // src/overlay/underlines.ts (Harper) but is kept fully independent: separate
 // perTarget map, separate click handler, separate teardown. The two engines
-// must never share state — see CLAUDE.md "Dual-engine architecture".
+// must never share state — see AGENTS.md "Dual-engine architecture".
 
 import { readText, type EditableTarget } from "../lib/editable"
 import { getOverlayLayer } from "../lib/shadow-root"

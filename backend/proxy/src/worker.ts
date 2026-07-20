@@ -1,14 +1,11 @@
 import { RESPONSE_SCHEMA, SYSTEM_PROMPT } from "./prompt"
 
 export type Env = {
-  GEMINI_API_KEY: string
+  AI: Ai
   RATE_LIMITER?: { limit: (opts: { key: string }) => Promise<{ success: boolean }> }
 }
 
 const MAX_INPUT_CHARS = 8000
-
-const GEMINI_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemma-4-26b-a4b-it:generateContent"
 
 type PolishChange = {
   original: string
@@ -67,52 +64,49 @@ function validResult(value: unknown): value is PolishResult {
   return true
 }
 
-async function callGemini(text: string, apiKey: string): Promise<PolishResult | null> {
-  const body = {
-    contents: [{ role: "user", parts: [{ text }] }],
-    systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-    generationConfig: {
-      responseMimeType: "application/json",
-      responseSchema: RESPONSE_SCHEMA,
-      temperature: 0.2,
-      maxOutputTokens: 2048
-    }
-  }
-  const res = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(apiKey)}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
-  })
-  if (!res.ok) {
-    const errBody = await res.text().catch(() => "<unreadable>")
-    console.warn(
-      `[polish] gemini http ${res.status} ${res.statusText} body=${errBody.slice(0, 500)}`
-    )
-    return null
-  }
-  const data = (await res.json()) as {
-    candidates?: Array<{
-      content?: { parts?: Array<{ text?: string }> }
-      finishReason?: string
-    }>
-    promptFeedback?: { blockReason?: string }
-  }
-  const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text
-  if (!raw) {
-    console.warn(
-      `[polish] gemini empty candidate finish=${data?.candidates?.[0]?.finishReason} block=${data?.promptFeedback?.blockReason}`
-    )
-    return null
-  }
+const MODEL = "@cf/google/gemma-4-26b-a4b-it"
+
+async function callCloudflareAi(
+  text: string,
+  ai: Ai
+): Promise<PolishResult | null> {
   try {
-    const parsed = JSON.parse(raw)
-    if (!validResult(parsed)) {
-      console.warn(`[polish] gemini invalid shape raw=${raw.slice(0, 500)}`)
-      return null
+    const output = await ai.run(MODEL, {
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: text }
+      ],
+      temperature: 0,
+      max_completion_tokens: 2048,
+
+      // Saves latency and output tokens for a straightforward editing task.
+      chat_template_kwargs: {
+        enable_thinking: false
+      },
+
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "polish_result",
+          strict: true,
+          schema: RESPONSE_SCHEMA
+        }
+      }
+    })
+
+    const response = output as {
+      choices?: Array<{
+        message?: { content?: string | null }
+      }>
     }
-    return parsed
-  } catch (err) {
-    console.warn(`[polish] gemini json parse fail: ${(err as Error).message}`)
+
+    const raw = response.choices?.[0]?.message?.content
+    if (!raw) return null
+
+    const parsed: unknown = JSON.parse(raw)
+    return validResult(parsed) ? parsed : null
+  } catch (error) {
+    console.warn("[polish] Workers AI failure", error)
     return null
   }
 }
@@ -167,7 +161,7 @@ export default {
       return json({ error: "bad_text_length" }, 400, origin)
     }
 
-    const result = await callGemini(text, env.GEMINI_API_KEY)
+    const result = await callCloudflareAi(text, env.AI)
     if (!result) {
       return json({ error: "upstream_error" }, 502, origin)
     }

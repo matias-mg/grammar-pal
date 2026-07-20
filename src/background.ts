@@ -1,7 +1,7 @@
 // This service worker hosts the HARPER engine (local WASM, always-on grammar
 // underlining). It also forwards POLISH requests to the Cloudflare Worker
-// proxy. The two engines are independent — never route Harper through Gemini,
-// or polish through Harper. See CLAUDE.md "Dual-engine architecture".
+// endpoint. The two engines are independent — never route Harper through the
+// polish backends, or polish through Harper. See AGENTS.md "Dual-engine architecture".
 //
 // Parcel (Plasmo's bundler) doesn't resolve the harper.js package.json
 // "exports" map cleanly — neither the bare specifier nor subpath like
@@ -10,8 +10,19 @@ import { Dialect, LocalLinter, type Lint } from "harper.js/dist/index.js"
 import { binaryInlined } from "harper.js/dist/binaryInlined.js"
 
 import type { LintRequest, LintResponse } from "./lib/engine"
-import type { PolishRequest } from "./lib/engine-polish"
+import type {
+  PolishBackendRequest,
+  PolishBackendResponse,
+  PolishRequest,
+  TriggerLocalAiDownloadRequest,
+  TriggerLocalAiDownloadResponse
+} from "./lib/engine-polish"
 import { runLocalRules } from "./lib/local-rules"
+import {
+  resolvePolishBackend,
+  triggerLocalAiDownload
+} from "./lib/polish-backend"
+import { polishLocally } from "./lib/polish-prompt-api"
 import type { Category, Match } from "./lib/types"
 import type { PolishResult } from "./types/polish"
 
@@ -109,6 +120,25 @@ async function polishViaProxy(text: string): Promise<PolishResult | null> {
   }
 }
 
+async function polishViaPromptApi(text: string): Promise<PolishResult | null> {
+  const existing = polishInFlight.get(text)
+  if (existing) return existing
+
+  const request = polishLocally(text)
+  polishInFlight.set(text, request)
+  try {
+    return await request
+  } finally {
+    polishInFlight.delete(text)
+  }
+}
+
+async function dispatchPolish(text: string): Promise<PolishResult | null> {
+  const backend = await resolvePolishBackend()
+  if (backend === "prompt-api") return polishViaPromptApi(text)
+  return polishViaProxy(text)
+}
+
 function reservePolishRequestSlot(now = Date.now()): boolean {
   const cutoff = now - POLISH_RATE_WINDOW_MS
   while (polishRequestTimes.length > 0 && polishRequestTimes[0]! <= cutoff) {
@@ -143,7 +173,11 @@ async function fetchPolishViaProxy(
   }
 }
 
-type IncomingMessage = LintRequest | PolishRequest
+type IncomingMessage =
+  | LintRequest
+  | PolishRequest
+  | PolishBackendRequest
+  | TriggerLocalAiDownloadRequest
 
 chrome.runtime.onMessage.addListener(
   (msg: IncomingMessage, _sender, sendResponse) => {
@@ -155,11 +189,33 @@ chrome.runtime.onMessage.addListener(
       return true
     }
     if (msg?.type === "polish") {
-      polishViaProxy(msg.text).then(
+      dispatchPolish(msg.text).then(
         (result) => sendResponse(result),
         (err) => {
           console.warn("[grammar-pal] polish failed", err)
           sendResponse(null)
+        }
+      )
+      return true
+    }
+    if (msg?.type === "get-polish-backend") {
+      resolvePolishBackend().then(
+        (backend) =>
+          sendResponse({ backend } satisfies PolishBackendResponse),
+        (err) => {
+          console.warn("[grammar-pal] backend resolve failed", err)
+          sendResponse({ backend: "workers-ai" } satisfies PolishBackendResponse)
+        }
+      )
+      return true
+    }
+    if (msg?.type === "trigger-local-ai-download") {
+      triggerLocalAiDownload().then(
+        (ok) =>
+          sendResponse({ ok } satisfies TriggerLocalAiDownloadResponse),
+        (err) => {
+          console.warn("[grammar-pal] local AI download failed", err)
+          sendResponse({ ok: false } satisfies TriggerLocalAiDownloadResponse)
         }
       )
       return true

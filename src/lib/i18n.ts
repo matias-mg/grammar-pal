@@ -6,7 +6,13 @@ export const strings = {
   enabledLabel: "Enabled",
   modeLabel: "Mode",
   modeFormal: "Formal",
+  modeFormalDescription: "Stricter checks for work, school, and polished writing.",
   modeChill: "Chill",
+  modeChillDescription: "Lighter suggestions that keep casual wording and tone.",
+  palLabel: "Pal",
+  palCurrentName: "Classic Pal",
+  palCurrentDescription: "Your writing buddy for now.",
+  palPickerSoon: "More pals later",
 
   applyLabel: "Apply",
   noSuggestions: "No suggestions available.",
@@ -19,15 +25,45 @@ export const strings = {
   petTooltipAlarmed: "Lots of issues — take a look.",
 
   polishLabel: "Polish to native (uses AI, opt-in)",
-  polishPrivacyPrefix: "Your text is sent to Google's AI. See ",
+  polishCloudBadge: "Cloudflare AI fallback",
+  polishCloudTitle: "Cloud polish is active",
+  polishCloudBody:
+    "Your browser's local AI is not ready, so polish suggestions use Gemma 4 on Cloudflare Workers AI. Local AI is usually faster and keeps your text on this device.",
+  polishPrivacyPrefix: "See Cloudflare's ",
   polishPrivacyLink: "privacy policy",
+  polishPrivacyUrl: "https://www.cloudflare.com/privacypolicy/",
   polishPrivacySuffix: ".",
   polishTitle: "Polish to native English",
   polishAccept: "Accept",
   polishSkip: "Skip",
   polishLoading: "AI checking...",
   polishPopoverAriaLabel: "Polish suggestion",
-  polishToastError: "Polish unavailable, try again shortly"
+  polishToastError: "Polish unavailable, try again shortly",
+
+  localAiModalTitle: "Make Grammar Pal much faster and fully private",
+  localAiModalBody:
+    "One-time download for faster suggestions, offline support, and full privacy.",
+  localAiModalBodyLearnMorePrefix: " Learn more ",
+  localAiModalBodyLearnMoreLink: "here",
+  localAiModalBodyLearnMoreUrl: "https://developer.chrome.com/docs/ai/prompt-api",
+  localAiModalBodyLearnMoreUrlEdge:
+    "https://learn.microsoft.com/en-us/microsoft-edge/web-platform/prompt-api",
+  localAiModalNote: "Powered by your browser’s official local AI — not by Grammar Pal.",
+  localAiModalAccept: "Enable local AI",
+  localAiModalReject: "Not now",
+  localAiModalAriaLabel: "Enable local AI",
+
+  popupPolishPrivacyLocal:
+    "Running locally via your browser's built-in AI — your text never leaves your device.",
+
+  edgeLocalAiHintPrefix: "To use local AI on Edge, install ",
+  edgeLocalAiHintCanaryLink: "Edge Canary or Dev",
+  edgeLocalAiHintCanaryUrl: "https://www.microsoft.com/edge/download/insider",
+  edgeLocalAiHintMiddle: " and enable ",
+  edgeLocalAiHintFlagLink: "the Prompt API flag",
+  edgeLocalAiHintFlagUrl:
+    "edge://flags",
+  edgeLocalAiHintSuffix: "."
 } as const
 
 export type StringKey = keyof typeof strings

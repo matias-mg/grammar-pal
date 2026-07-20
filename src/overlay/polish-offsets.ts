@@ -1,4 +1,4 @@
-// Resolve Gemini's substring-keyed PolishChange[] into character offsets
+// Resolve the AI backend's substring-keyed PolishChange[] into character offsets
 // against the current text. The backend guarantees each `change.original`
 // is a substring of the input at polish time; we walk the changes in
 // document order with a running cursor so duplicate substrings (e.g. two
