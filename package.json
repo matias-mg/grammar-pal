@@ -1,7 +1,7 @@
 {
   "name": "grammar-pal",
   "displayName": "Grammar Pal",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Live grammar/style underlines on any editable field, plus a corner pet that reacts to your errors.",
   "author": "Grammar Pal",
   "scripts": {
