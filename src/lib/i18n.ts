@@ -10,9 +10,10 @@ export const strings = {
   modeChill: "Chill",
   modeChillDescription: "Lighter suggestions that keep casual wording and tone.",
   palLabel: "Pal",
-  palCurrentName: "Classic Pal",
-  palCurrentDescription: "Your writing buddy for now.",
-  palPickerSoon: "More pals later",
+  palCatName: "Cat",
+  palCatDescription: "Quiet, warm, and focused.",
+  palClassicName: "Classic",
+  palClassicDescription: "The original round pal.",
 
   applyLabel: "Apply",
   noSuggestions: "No suggestions available.",

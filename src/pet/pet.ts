@@ -1,7 +1,7 @@
 import { strings } from "../lib/i18n"
 import { getShadowRoot } from "../lib/shadow-root"
-import type { Mode } from "../lib/types"
-import { expressions, type Expression } from "./expressions"
+import type { Mode, Pal } from "../lib/types"
+import { expressionFor, type Expression } from "./expressions"
 import { bucketFor, tooltipFor } from "./pet-state"
 
 const PET_SIZE = 56
@@ -13,6 +13,7 @@ let faceEl: HTMLDivElement | null = null
 let modeEl: HTMLDivElement | null = null
 let lastExpression: Expression | null = null
 let lastMode: Mode | null = null
+let lastPal: Pal = "cat"
 let targetEl: HTMLElement | null = null
 let listenersAttached = false
 let rafId: number | null = null
@@ -37,17 +38,30 @@ function ensurePet(): HTMLDivElement {
   petEl = div
   faceEl = face
   modeEl = mode
+  applyPal()
+  renderFace()
   if (lastMode) applyMode(lastMode)
   return div
 }
 
+function renderFace(): void {
+  if (!faceEl || !lastExpression) return
+  faceEl.innerHTML = expressionFor(lastPal, lastExpression)
+}
+
+function applyPal(): void {
+  if (!petEl) return
+  petEl.dataset["pal"] = lastPal
+}
+
 export function setPetExpression(expression: Expression): void {
   ensurePet()
-  if (lastExpression === expression) return
-  if (faceEl) faceEl.innerHTML = expressions[expression]
+  if (lastExpression !== expression || !faceEl?.firstElementChild) {
+    lastExpression = expression
+    renderFace()
+  }
   petEl?.setAttribute("aria-label", tooltipFor(expression))
   if (petEl) petEl.title = tooltipFor(expression)
-  lastExpression = expression
 }
 
 export function setPetCount(count: number): void {
@@ -65,6 +79,14 @@ export function setPetMode(mode: Mode): void {
   ensurePet()
   lastMode = mode
   applyMode(mode)
+}
+
+export function setPetPal(pal: Pal): void {
+  ensurePet()
+  if (lastPal === pal && petEl?.dataset["pal"] === pal) return
+  lastPal = pal
+  applyPal()
+  renderFace()
 }
 
 function repositionPet(): void {

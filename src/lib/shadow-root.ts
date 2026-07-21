@@ -163,6 +163,7 @@ const STYLES = `
     position: fixed;
     left: 0;
     top: 0;
+    z-index: 2147483647;
     width: 56px;
     height: 56px;
     pointer-events: auto;
@@ -183,6 +184,9 @@ const STYLES = `
     box-sizing: border-box;
     background: #9ca3af;
   }
+    .pet[data-pal="cat"] .pet__mode {
+      display: none;
+    }
   .pet__mode--formal { background: #2563eb; }
   .pet__mode--chill  { background: #10b981; }
 

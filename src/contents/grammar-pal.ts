@@ -73,7 +73,8 @@ import {
   detachPet,
   hidePet,
   setPetCount,
-  setPetMode
+  setPetMode,
+  setPetPal
 } from "../pet/pet"
 
 export const config: PlasmoCSConfig = {
@@ -217,6 +218,7 @@ function init(): () => void {
     if (listenerAbort.signal.aborted) return
     settings = s
     setPetMode(s.mode)
+    setPetPal(s.pal)
     applyEnabledState()
   })
   void getPolishBackend().then((backend) => {
@@ -232,6 +234,7 @@ function init(): () => void {
     const prev = settings
     settings = s
     setPetMode(s.mode)
+    setPetPal(s.pal)
     applyEnabledState()
     if (s.enabled && s.mode !== prev.mode) recheckAll()
     if (!s.polishEnabled) {

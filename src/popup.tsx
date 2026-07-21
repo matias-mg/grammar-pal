@@ -6,10 +6,38 @@ import {
 } from "./lib/engine-polish"
 import { strings } from "./lib/i18n"
 import { getSettings, onSettingsChange, setSettings } from "./lib/storage"
-import type { Settings } from "./lib/types"
+import type { Pal, Settings } from "./lib/types"
+import { expressionFor } from "./pet/expressions"
 
 const isEdge =
   typeof navigator !== "undefined" && navigator.userAgent.includes("Edg/")
+
+const PAL_OPTIONS: ReadonlyArray<{
+  id: Pal
+  name: string
+  description: string
+}> = [
+  {
+    id: "cat",
+    name: strings.palCatName,
+    description: strings.palCatDescription
+  },
+  {
+    id: "classic",
+    name: strings.palClassicName,
+    description: strings.palClassicDescription
+  }
+]
+
+function PalPreview({ pal }: { pal: Pal }) {
+  return (
+    <span
+      className="gp-pal-preview"
+      aria-hidden="true"
+      dangerouslySetInnerHTML={{ __html: expressionFor(pal, "happy") }}
+    />
+  )
+}
 
 function IndexPopup() {
   const [settings, setLocal] = useState<Settings | null>(null)
@@ -113,19 +141,34 @@ function IndexPopup() {
           </div>
         </fieldset>
 
-        <section className="gp-pal">
-          <div className="gp-section-kicker">{strings.palLabel}</div>
-          <div className="gp-pal__row">
-            <span className="gp-pal__avatar" aria-hidden="true" />
-            <span className="gp-pal__copy">
-              <span className="gp-label">{strings.palCurrentName}</span>
-              <span>{strings.palCurrentDescription}</span>
-            </span>
-            <button className="gp-pal__soon" type="button" disabled>
-              {strings.palPickerSoon}
-            </button>
+        <fieldset className="gp-pal" disabled={!settings.enabled}>
+          <legend>{strings.palLabel}</legend>
+          <div className="gp-pal-grid">
+            {PAL_OPTIONS.map((pal) => (
+              <label className="gp-pal-choice" key={pal.id}>
+                <input
+                  className="gp-pal-choice__input"
+                  type="radio"
+                  name="pal"
+                  value={pal.id}
+                  checked={settings.pal === pal.id}
+                  onChange={() => {
+                    void setSettings({ pal: pal.id })
+                  }}
+                />
+                <span className="gp-pal-card">
+                  <PalPreview pal={pal.id} />
+                  <span className="gp-pal-copy">
+                    <span className="gp-pal-name">{pal.name}</span>
+                    <span className="gp-pal-description">
+                      {pal.description}
+                    </span>
+                  </span>
+                </span>
+              </label>
+            ))}
           </div>
-        </section>
+        </fieldset>
 
         <section className="gp-polish">
           <label className="gp-toggle-row gp-toggle-row--compact">
@@ -376,7 +419,8 @@ const popupCss = `
   }
 
   .gp-switch__input,
-  .gp-choice__input {
+  .gp-choice__input,
+  .gp-pal-choice__input {
     position: absolute;
     opacity: 0;
     inset: 0;
@@ -428,7 +472,8 @@ const popupCss = `
   }
 
   .gp-switch__input:focus-visible + .gp-switch__track,
-  .gp-choice__input:focus-visible + .gp-choice__card {
+  .gp-choice__input:focus-visible + .gp-choice__card,
+  .gp-pal-choice__input:focus-visible + .gp-pal-card {
     outline: 2px solid rgba(124, 196, 255, 0.95);
     outline-offset: 2px;
   }
@@ -446,15 +491,6 @@ const popupCss = `
   .gp-mode legend {
     margin: 0 0 8px;
     padding: 0;
-    color: var(--gp-muted);
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
-
-  .gp-section-kicker {
-    margin: 0 0 8px;
     color: var(--gp-muted);
     font-size: 11px;
     font-weight: 700;
@@ -521,55 +557,94 @@ const popupCss = `
 
   .gp-pal {
     margin: 0 0 12px;
+    padding: 0;
+    border: 0;
   }
 
-  .gp-pal__row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px;
-    border: 1px solid rgba(245, 165, 36, 0.2);
-    border-radius: 9px;
-    background:
-      linear-gradient(135deg, rgba(245, 165, 36, 0.11), rgba(255, 255, 255, 0.035)),
-      rgba(255, 255, 255, 0.035);
+  .gp-pal:disabled {
+    opacity: 0.48;
   }
 
-  .gp-pal__avatar {
-    flex: 0 0 auto;
-    width: 36px;
-    height: 36px;
-    border: 1px solid rgba(245, 165, 36, 0.42);
-    border-radius: 50%;
-    background:
-      radial-gradient(circle at 36% 35%, #fff6c7 0 9%, transparent 10%),
-      radial-gradient(circle at 64% 35%, #fff6c7 0 9%, transparent 10%),
-      radial-gradient(ellipse at 50% 64%, #1f2328 0 15%, transparent 16%),
-      linear-gradient(145deg, #fde68a, #f5a524 56%, #f87171);
-    box-shadow: 0 0 0 4px rgba(245, 165, 36, 0.12);
-  }
-
-  .gp-pal__copy {
-    min-width: 0;
-    display: grid;
-    gap: 1px;
-    flex: 1 1 auto;
-    color: var(--gp-faint);
+  .gp-pal legend {
+    margin: 0 0 8px;
+    padding: 0;
+    color: var(--gp-muted);
     font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
   }
 
-  .gp-pal__soon {
-    flex: 0 0 auto;
-    max-width: 78px;
-    border: 1px solid rgba(255, 255, 255, 0.13);
-    border-radius: 999px;
-    padding: 5px 8px;
+  .gp-pal-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .gp-pal-choice {
+    position: relative;
+    min-width: 0;
+    cursor: pointer;
+  }
+
+  .gp-pal-card {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    min-height: 66px;
+    padding: 8px;
+    border: 1px solid var(--gp-line);
+    border-radius: 9px;
     background: rgba(255, 255, 255, 0.045);
-    color: rgba(255, 255, 255, 0.45);
-    font: inherit;
+    transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+  }
+
+  .gp-pal-preview {
+    display: grid;
+    place-items: center;
+    width: 42px;
+    height: 42px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.11);
+    border-radius: 10px;
+    background:
+      linear-gradient(145deg, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.045)),
+      #191c24;
+  }
+
+  .gp-pal-preview svg {
+    display: block;
+    width: 38px;
+    height: 38px;
+  }
+
+  .gp-pal-copy {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .gp-pal-name {
+    color: var(--gp-text);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .gp-pal-description {
+    color: var(--gp-faint);
     font-size: 10.5px;
-    line-height: 1.15;
-    cursor: not-allowed;
+    line-height: 1.25;
+  }
+
+  .gp-pal-choice__input:checked + .gp-pal-card {
+    border-color: rgba(245, 165, 36, 0.76);
+    background: linear-gradient(135deg, rgba(245, 165, 36, 0.15), rgba(66, 133, 244, 0.08));
+    box-shadow: inset 0 0 0 1px rgba(245, 165, 36, 0.08);
+  }
+
+  .gp-pal-choice__input:checked + .gp-pal-card .gp-pal-preview {
+    border-color: rgba(245, 165, 36, 0.45);
   }
 
   .gp-polish {
@@ -664,7 +739,8 @@ const popupCss = `
 
     .gp-switch__track,
     .gp-switch__thumb,
-    .gp-choice__card {
+    .gp-choice__card,
+    .gp-pal-card {
       transition: none;
     }
   }
