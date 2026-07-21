@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "plasmo dev",
     "build": "plasmo build",
-    "package": "plasmo package",
+    "package": "plasmo build && plasmo package",
     "test": "vitest run src/lib/languagetool.test.ts src/lib/polish-state.test.ts",
     "test:harper:eval": "vitest run --reporter=verbose src/lib/harper.evaluation.test.ts",
     "release:patch": "pnpm test && pnpm version patch && git push --follow-tags",

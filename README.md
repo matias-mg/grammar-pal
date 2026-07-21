@@ -103,10 +103,15 @@ pnpm dev
 
 Open `chrome://extensions`, enable Developer mode, click **Load unpacked**, and select `build/chrome-mv3-dev`.
 
-Create a production build or ZIP with:
+Create an unpacked production build with:
 
 ```bash
 pnpm build
+```
+
+Create a production build and ZIP with one command:
+
+```bash
 pnpm package
 ```
 

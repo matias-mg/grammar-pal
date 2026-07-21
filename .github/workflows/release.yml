@@ -61,7 +61,8 @@ jobs:
       - name: Package extension
         shell: bash
         run: |
-          pnpm package
+          pnpm build
+          pnpm exec plasmo package
           cp build/chrome-mv3-prod.zip "build/grammar-pal-${RELEASE_TAG}-chrome.zip"
           unzip -t "build/grammar-pal-${RELEASE_TAG}-chrome.zip"
 
