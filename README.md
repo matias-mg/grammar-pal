@@ -27,8 +27,9 @@ Grammar Pal should now appear in Chrome. You can pin it from the Extensions menu
 
 1. Open the Grammar Pal popup and make sure **Enabled** is on.
 2. Choose **Formal** for stricter checks or **Chill** for lighter suggestions.
-3. Start typing in a normal text field.
-4. Click an underline to read the suggestion and apply a replacement.
+3. Choose the default **Cat** pal or switch back to the original **Classic** pal.
+4. Start typing in a normal text field.
+5. Click an underline to read the suggestion and apply a replacement.
 
 Underline colors have simple meanings:
 
@@ -37,7 +38,7 @@ Underline colors have simple meanings:
 - **Blue:** other writing suggestions
 - **Animated gradient:** optional AI polish
 
-The pet changes expression as the number of writing issues increases.
+The selected pet changes expression as the number of writing issues increases. The quiet grey cat is selected by default, and the popup remembers your choice.
 
 ### Optional AI polish
 
